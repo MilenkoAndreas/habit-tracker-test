@@ -47,7 +47,7 @@ export default function HowItWorksScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <Text style={s.intro}>
-          Antigravity helps you build daily habits through consistent repetition and clear visual feedback.
+          Habit Tracker helps you build daily habits through consistent repetition and clear visual feedback.
         </Text>
 
         {STEPS.map((step, i) => (

@@ -120,7 +120,7 @@ export default function ManageScreen({ navigation }) {
             <Text style={s.settingEmoji}>❓</Text>
             <View>
               <Text style={s.settingTitle}>How it works</Text>
-              <Text style={s.settingDesc}>A quick guide to using Antigravity</Text>
+              <Text style={s.settingDesc}>A quick guide to using Habit Tracker</Text>
             </View>
           </View>
           <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>

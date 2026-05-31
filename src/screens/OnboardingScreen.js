@@ -16,7 +16,7 @@ const TOTAL_STEPS = 3;
 const HOW_IT_WORKS = [
   { emoji: '➕', title: 'Add your habits', desc: 'Pick anything you want to do every day — exercise, reading, drinking water, whatever matters to you.' },
   { emoji: '✅', title: 'Tap when done', desc: 'Each day, tap a habit to mark it complete. All done? You\'ll get a celebration and your streak grows.' },
-  { emoji: '📊', title: 'Track your progress', desc: 'See your streaks, history and stats. Consistency is the goal — Antigravity keeps score for you.' },
+  { emoji: '📊', title: 'Track your progress', desc: 'See your streaks, history and stats. Consistency is the goal — Habit Tracker keeps score for you.' },
 ];
 
 const EMOJIS = ['💧','🏃','📚','🧘','😴','🥗','💪','🎯','✍️','🎸','🌿','🧠'];
@@ -85,7 +85,7 @@ export default function OnboardingScreen({ navigation }) {
             {step === 0 && (
               <View style={styles.explainer}>
                 <Text style={styles.appIcon}>🚀</Text>
-                <Text style={styles.appName}>Antigravity</Text>
+                <Text style={styles.appName}>Habit Tracker</Text>
                 <Text style={styles.appTagline}>Your daily habit tracker</Text>
 
                 <View style={styles.howList}>

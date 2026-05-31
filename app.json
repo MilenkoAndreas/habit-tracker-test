@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "antigravity-app",
-    "slug": "antigravity-app",
+    "name": "habit-tracker-test",
+    "slug": "habit-tracker-test",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

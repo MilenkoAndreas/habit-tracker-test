@@ -1,4 +1,4 @@
-# Antigravity
+# Habit Tracker Test
 
 A habit tracker built with Expo and React Native. Track daily habits, build streaks, and stay consistent — one tap at a time.
 
