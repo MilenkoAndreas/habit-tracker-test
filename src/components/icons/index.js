@@ -1,7 +1,7 @@
 // src/components/icons/index.js
 import React from 'react';
 import Svg, {
-  Path, Circle, Rect, Line, Polyline, G,
+  Path, Circle, Rect, Line, Polyline,
 } from 'react-native-svg';
 
 const DEFAULT_COLOR = '#111111';
@@ -144,7 +144,7 @@ export function IconHeart({ color = DEFAULT_COLOR, size = DEFAULT_SIZE }) {
 
 // ── Checkmark (used inside the done check tile on HabitCard) ───────────────
 
-export function IconCheck({ color = '#ffffff', size = DEFAULT_SIZE }) {
+export function IconCheck({ color = '#ffffff', size = DEFAULT_SIZE }) { // white default: always rendered inside a colored tile
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Polyline points="4,13 9,18 20,7" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
