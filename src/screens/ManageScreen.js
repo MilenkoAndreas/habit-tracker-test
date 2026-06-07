@@ -5,13 +5,16 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useApp, useColors } from '../AppContext';
+import { useAuth } from '../AuthContext';
 import { calcStreak, dateKey } from '../storage';
 import { cancelHabitReminder } from '../notifications';
 import { SPACING, RADIUS } from '../theme';
+import { ICON_MAP } from '../components/icons/index';
 
 export default function ManageScreen({ navigation }) {
   const { state, dispatch } = useApp();
   const colors = useColors();
+  const { signOut } = useAuth();
   const { habits, logs, darkMode } = state;
   const [showDevTools, setShowDevTools] = useState(false);
   const [pastDays, setPastDays] = useState(3);
@@ -111,31 +114,12 @@ export default function ManageScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-
-        {/* App info */}
-        <Text style={s.sectionLabel}>App</Text>
-        <TouchableOpacity style={s.settingRow} onPress={openHowItWorks} activeOpacity={0.75}>
-          <View style={s.settingLeft}>
-            <Text style={s.settingEmoji}>❓</Text>
-            <View>
-              <Text style={s.settingTitle}>How it works</Text>
-              <Text style={s.settingDesc}>A quick guide to using Habit Tracker</Text>
-            </View>
-          </View>
-          <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
-        </TouchableOpacity>
+      <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
         {/* Appearance section */}
         <Text style={s.sectionLabel}>Appearance</Text>
         <View style={s.settingRow}>
-          <View style={s.settingLeft}>
-            <Text style={s.settingEmoji}>{darkMode ? '🌙' : '☀️'}</Text>
-            <View>
-              <Text style={s.settingTitle}>{darkMode ? 'Dark Mode' : 'Light Mode'}</Text>
-              <Text style={s.settingDesc}>Switch the app theme</Text>
-            </View>
-          </View>
+          <Text style={s.settingLabel}>{darkMode ? 'Dark Mode' : 'Light Mode'}</Text>
           <Switch
             value={darkMode}
             onValueChange={toggleDark}
@@ -143,6 +127,13 @@ export default function ManageScreen({ navigation }) {
             thumbColor={darkMode ? '#fff' : '#fff'}
           />
         </View>
+
+        {/* App info */}
+        <Text style={s.sectionLabel}>App</Text>
+        <TouchableOpacity style={s.settingRow} onPress={openHowItWorks} activeOpacity={0.75}>
+          <Text style={s.settingLabel}>How it works</Text>
+          <Text style={s.settingValue}>›</Text>
+        </TouchableOpacity>
 
         {/* Habits section */}
         <Text style={s.sectionLabel}>My Habits</Text>
@@ -157,60 +148,61 @@ export default function ManageScreen({ navigation }) {
           </View>
         ) : (
           <>
-            <Text style={s.hint}>Tap ✏️ to edit · Tap 🗑️ to delete</Text>
             {habits.map((habit) => {
-              const streak = calcStreak(logs, habit);
+              const IconComp = ICON_MAP[habit.emoji];
               return (
-                <View key={habit.id} style={[s.card, { borderLeftColor: habit.color }]}>
-                  <Text style={s.cardEmoji}>{habit.emoji}</Text>
-                  <View style={s.cardInfo}>
-                    <Text style={s.cardName} numberOfLines={1}>{habit.name}</Text>
-                    <View style={s.cardMeta}>
-                      <View style={[s.metaBadge, { backgroundColor: habit.color + '22' }]}>
-                        <Text style={[s.metaBadgeText, { color: habit.color }]}>
-                          {habit.type === 'volume' ? `${habit.targetCount}× daily` : 'Once daily'}
-                        </Text>
-                      </View>
-                      {streak > 0 && (
-                        <View style={s.streakBadge}>
-                          <Text style={s.streakText}>🔥 {streak}d</Text>
-                        </View>
-                      )}
-                      {habit.reminder?.enabled && (
-                        <View style={s.reminderBadge}>
-                          <Text style={s.reminderBadgeText}>🔔 {formatTime(habit.reminder.hour, habit.reminder.minute)}</Text>
-                        </View>
-                      )}
-                    </View>
+                <View key={habit.id} style={s.habitRow}>
+                  <View style={s.habitIconTile}>
+                    {IconComp
+                      ? <IconComp color={colors.card} size={18} />
+                      : <Text style={{ fontSize: 18 }}>{habit.emoji}</Text>}
                   </View>
-                  <TouchableOpacity style={s.iconBtn} onPress={() => openEdit(habit)}>
-                    <Text style={s.iconBtnText}>✏️</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.iconBtn} onPress={() => confirmDelete(habit)}>
-                    <Text style={s.iconBtnText}>🗑️</Text>
-                  </TouchableOpacity>
+                  <Text style={s.habitName} numberOfLines={1}>{habit.name}</Text>
+                  <Text style={s.habitStreak}>{calcStreak(logs, habit)} day streak</Text>
+                  <View style={s.habitActions}>
+                    <TouchableOpacity style={s.actionBtn} onPress={() => openEdit(habit)}>
+                      <Text style={s.actionBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.actionBtn, s.deleteBtn]} onPress={() => confirmDelete(habit)}>
+                      <Text style={[s.actionBtnText, s.deleteBtnText]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             })}
+            <View style={s.addRow}>
+              <View style={s.addIcon}>
+                <Text style={{ fontSize: 18, color: colors.textSecondary }}>+</Text>
+              </View>
+              <TouchableOpacity onPress={openCreate}>
+                <Text style={s.addText}>Add Habit</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
+        {/* Sign Out */}
+        <TouchableOpacity style={s.signOutBtn} onPress={signOut} activeOpacity={0.75}>
+          <Text style={s.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+
         {/* Developer / Test Tools */}
+        <View style={s.devSection}>
         <TouchableOpacity style={s.devToggle} onPress={() => setShowDevTools(v => !v)} activeOpacity={0.7}>
-          <Text style={s.devToggleText}>🛠 Test Tools {showDevTools ? '▲' : '▼'}</Text>
+          <Text style={s.devToggleText}>Test Tools {showDevTools ? '▲' : '▼'}</Text>
         </TouchableOpacity>
 
         {showDevTools && (
-          <View style={s.devSection}>
+          <>
             <TouchableOpacity style={s.devBtn} onPress={devCompleteAll}>
-              <Text style={s.devBtnText}>{'✅  Complete all habits today'}</Text>
+              <Text style={s.devBtnText}>{'Complete all habits today'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.devBtn} onPress={devResetToday}>
-              <Text style={s.devBtnText}>{'↩️  Reset today\'s progress'}</Text>
+              <Text style={s.devBtnText}>{"Reset today's progress"}</Text>
             </TouchableOpacity>
 
             <View style={[s.devBtn, s.devBtnRow]}>
-              <Text style={[s.devBtnText, { flex: 1 }]}>{'📅  Complete past days'}</Text>
+              <Text style={[s.devBtnText, { flex: 1 }]}>{'Complete past days'}</Text>
               <View style={s.stepper}>
                 <TouchableOpacity style={s.stepperBtn} onPress={() => setPastDays(d => Math.max(1, d - 1))}>
                   <Text style={s.stepperBtnText}>−</Text>
@@ -226,16 +218,17 @@ export default function ManageScreen({ navigation }) {
             </View>
 
             <TouchableOpacity style={s.devBtn} onPress={devRestartChallenge}>
-              <Text style={s.devBtnText}>{'🔄  Restart 3-day challenge'}</Text>
+              <Text style={s.devBtnText}>{'Restart 3-day challenge'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.devBtn, s.devBtnDanger]} onPress={devWipeAll}>
-              <Text style={[s.devBtnText, s.devBtnTextDanger]}>{'🗑️  Clear all data'}</Text>
+              <Text style={[s.devBtnText, s.devBtnTextDanger]}>{'Clear all data'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.devBtn, s.devBtnDanger]} onPress={devResetOnboarding}>
-              <Text style={[s.devBtnText, s.devBtnTextDanger]}>{'🔁  Reset onboarding'}</Text>
+              <Text style={[s.devBtnText, s.devBtnTextDanger]}>{'Reset onboarding'}</Text>
             </TouchableOpacity>
-          </View>
+          </>
         )}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -245,6 +238,9 @@ export default function ManageScreen({ navigation }) {
 function getStyles(colors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
+    scroll: { flex: 1 },
+    content: { paddingBottom: 100 },
+
     topBar: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
@@ -253,60 +249,85 @@ function getStyles(colors) {
     title: { fontSize: 20, fontWeight: '800', color: colors.text },
     addBtn: { backgroundColor: colors.primary, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.full },
     addBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-    content: { padding: SPACING.lg, paddingBottom: 100 },
+
     sectionLabel: {
-      fontSize: 12, fontWeight: '700', color: colors.textSecondary,
-      textTransform: 'uppercase', letterSpacing: 0.6,
-      marginBottom: SPACING.sm, marginTop: SPACING.md,
+      fontSize: 10, fontWeight: '700', letterSpacing: 1.5,
+      textTransform: 'uppercase', color: colors.textSecondary,
+      paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.sm,
     },
+
     settingRow: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      backgroundColor: colors.card, borderRadius: RADIUS.lg, padding: SPACING.md,
-      marginBottom: SPACING.sm,
-      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
-    },
-    settingLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-    settingEmoji: { fontSize: 24 },
-    settingTitle: { fontWeight: '600', fontSize: 15, color: colors.text },
-    settingDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-    hint: { fontSize: 12, color: colors.textSecondary, marginBottom: SPACING.sm },
-    card: {
       flexDirection: 'row', alignItems: 'center',
-      backgroundColor: colors.card, borderRadius: RADIUS.lg, padding: SPACING.md,
-      marginBottom: SPACING.sm, borderLeftWidth: 4,
-      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
-      gap: SPACING.sm,
+      paddingHorizontal: SPACING.lg, paddingVertical: 14,
+      backgroundColor: colors.card,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
     },
-    cardEmoji: { fontSize: 26 },
-    cardInfo: { flex: 1 },
-    cardName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 6 },
-    cardMeta: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-    metaBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.full },
-    metaBadgeText: { fontSize: 11, fontWeight: '700' },
-    streakBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.full, backgroundColor: colors.darkMode ? '#2A1F00' : '#FFF3E0' },
-    streakText: { fontSize: 11, fontWeight: '700', color: colors.warning },
-    reminderBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.full, backgroundColor: colors.background },
-    reminderBadgeText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
-    iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-    iconBtnText: { fontSize: 16 },
-    devToggle: { marginTop: SPACING.xl, alignSelf: 'center', paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md },
-    devToggleText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
-    devSection: { gap: SPACING.sm, marginTop: SPACING.sm },
+    settingLabel: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.text },
+    settingValue: { fontSize: 14, color: colors.textSecondary, fontWeight: '600' },
+
+    habitRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+      paddingHorizontal: SPACING.lg, paddingVertical: 12,
+      backgroundColor: colors.card,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
+    habitIconTile: {
+      width: 36, height: 36, borderRadius: 9,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    habitName: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
+    habitStreak: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    habitActions: { flexDirection: 'row', gap: SPACING.sm },
+    actionBtn: {
+      paddingHorizontal: 12, paddingVertical: 6,
+      borderRadius: RADIUS.full, borderWidth: 1.5, borderColor: colors.border,
+    },
+    actionBtnText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+    deleteBtn: { borderColor: colors.danger },
+    deleteBtnText: { color: colors.danger },
+
+    addRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+      paddingHorizontal: SPACING.lg, paddingVertical: 14,
+      backgroundColor: colors.card,
+    },
+    addIcon: {
+      width: 36, height: 36, borderRadius: 9,
+      borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    addText: { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
+
+    signOutBtn: {
+      marginHorizontal: SPACING.lg, marginTop: SPACING.xl,
+      paddingVertical: 14, borderRadius: RADIUS.full,
+      borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center',
+    },
+    signOutText: { fontSize: 16, fontWeight: '700', color: colors.textSecondary },
+
+    devSection: { marginHorizontal: SPACING.lg, marginTop: SPACING.lg },
+    devToggle: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
+    devToggleText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
     devBtn: {
-      backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SPACING.md,
-      borderWidth: 1, borderColor: colors.border,
+      paddingVertical: 10, borderRadius: RADIUS.md,
+      borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', marginBottom: SPACING.sm,
     },
     devBtnRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
     devBtnDanger: { borderColor: colors.danger + '44' },
-    devBtnText: { fontSize: 14, fontWeight: '600', color: colors.text },
+    devBtnText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
     devBtnTextDanger: { color: colors.danger },
+
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     stepperBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
     stepperBtnText: { fontSize: 16, fontWeight: '600', color: colors.text, lineHeight: 20 },
     stepperVal: { fontSize: 15, fontWeight: '700', color: colors.text, minWidth: 24, textAlign: 'center' },
     stepperRun: { backgroundColor: colors.primary, paddingHorizontal: SPACING.sm, paddingVertical: 6, borderRadius: RADIUS.md },
     stepperRunText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-    empty: { alignItems: 'center', paddingTop: 40 },
+
+    empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: SPACING.lg },
     emptyEmoji: { fontSize: 48, marginBottom: SPACING.md },
     emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: SPACING.sm },
     emptyHint: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: SPACING.xl },
