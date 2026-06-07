@@ -8,7 +8,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { AppProvider, useApp, useColors } from './src/AppContext';
 import { isOnboarded } from './src/storage';
-import { COLORS } from './src/theme';
 import { IconHome, IconBarChart, IconGrid } from './src/components/icons/index';
 
 import AuthScreen from './src/screens/AuthScreen';
@@ -124,7 +123,7 @@ function RootNavigator() {
     );
   }
 
-  if (onboarded === null) return <Splash />;
+  if (onboarded === null) return <SafeAreaProvider><Splash /></SafeAreaProvider>;
 
   return (
     <SafeAreaProvider>
