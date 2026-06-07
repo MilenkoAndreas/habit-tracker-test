@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useApp, useColors } from '../AppContext';
 import { scheduleHabitReminder, requestPermissions } from '../notifications';
 import { SPACING, RADIUS } from '../theme';
-import { ICON_PICKER_ITEMS, ICON_MAP, IconCheck } from '../components/icons/index';
+import { ICON_PICKER_ITEMS, ICON_MAP } from '../components/icons/index';
 
 export default function CreateHabitScreen({ navigation, route }) {
   const editHabit = route.params?.editHabit ?? null;
