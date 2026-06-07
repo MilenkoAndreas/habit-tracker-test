@@ -1,14 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, Animated, Modal, Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import HabitCard from '../components/HabitCard';
 import ConfettiOverlay from '../components/ConfettiOverlay';
+import { IconCheck } from '../components/icons/index';
 import { useApp, useColors } from '../AppContext';
-import { countForDate, dateKey } from '../storage';
+import { countForDate, dateKey, calcStreak } from '../storage';
 import { SPACING, RADIUS } from '../theme';
 
 export default function HomeScreen({ navigation }) {
@@ -16,6 +17,7 @@ export default function HomeScreen({ navigation }) {
   const colors = useColors();
   const { habits, logs, challenge, loading } = state;
   const today = dateKey();
+
   const [showAllDone, setShowAllDone] = useState(false);
   const [showChallengeWin, setShowChallengeWin] = useState(false);
   const [confetti, setConfetti] = useState(false);
@@ -25,17 +27,43 @@ export default function HomeScreen({ navigation }) {
 
   const completedHabits = habits.filter(h => countForDate(logs, h.id, today) >= h.targetCount);
   const allDone = habits.length > 0 && completedHabits.length === habits.length;
+  const progress = habits.length > 0 ? completedHabits.length / habits.length : 0;
+
+  // Overall streak: consecutive days where ALL habits were done
+  const overallStreak = useMemo(() => {
+    if (habits.length === 0) return 0;
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dk = dateKey(d);
+      const allDoneOnDay = habits.every(h => countForDate(logs, h.id, dk) >= h.targetCount);
+      if (allDoneOnDay) streak++;
+      else break;
+    }
+    return streak;
+  }, [habits, logs]);
+
+  const challengeStreak = useMemo(() => {
+    if (!challenge || challenge.completed) return 0;
+    let streak = 0;
+    for (let i = 0; i < challenge.days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const done = habits.every(h => countForDate(logs, h.id, dateKey(d)) >= h.targetCount);
+      if (done) streak++;
+      else break;
+    }
+    return streak;
+  }, [challenge, habits, logs]);
 
   useEffect(() => {
     if (loading) return;
-    // Seed prevAllDone on first post-hydration render so we don't
-    // celebrate habits that were already done before the app opened.
     if (!hydrated.current) {
       hydrated.current = true;
       prevAllDone.current = allDone;
       return;
     }
-
     if (allDone && !prevAllDone.current && habits.length > 0) {
       prevAllDone.current = true;
       setShowAllDone(true);
@@ -43,24 +71,9 @@ export default function HomeScreen({ navigation }) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Animated.spring(celebrateScale, { toValue: 1, useNativeDriver: true, tension: 50 }).start();
       setTimeout(() => { setShowAllDone(false); setConfetti(false); }, 3500);
-
-      if (challenge && !challenge.completed) {
-        let streak = 0;
-        for (let i = 0; i < challenge.days; i++) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const key = dateKey(d);
-          const done = challenge.habitIds.every(hid => {
-            const h = habits.find(h => h.id === hid);
-            return h && countForDate(logs, hid, key) >= h.targetCount;
-          });
-          if (done) streak++;
-          else break;
-        }
-        if (streak >= challenge.days) {
-          dispatch({ type: 'COMPLETE_CHALLENGE' });
-          setTimeout(() => setShowChallengeWin(true), 800);
-        }
+      if (challenge && !challenge.completed && challengeStreak >= challenge.days) {
+        dispatch({ type: 'COMPLETE_CHALLENGE' });
+        setTimeout(() => setShowChallengeWin(true), 800);
       }
     } else if (!allDone) {
       prevAllDone.current = false;
@@ -97,90 +110,112 @@ export default function HomeScreen({ navigation }) {
 
   const greeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return allDone ? 'All done.' : 'Good morning.';
+    if (h < 17) return allDone ? 'All done.' : 'Good afternoon.';
+    return allDone ? 'All done.' : 'Good evening.';
   };
 
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const progress = habits.length > 0 ? completedHabits.length / habits.length : 0;
+  const dateLabel = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toUpperCase()
+    + ' · ' + new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
 
-  const challengeDaysPassed = challenge ? (() => {
-    const [y, mo, day] = challenge.startDate.split('-').map(Number);
-    const start = Date.UTC(y, mo - 1, day);
-    const todayUTC = Date.UTC(...today.split('-').map(Number));
-    return Math.min(Math.floor((todayUTC - start) / 86400000) + 1, challenge.days);
-  })() : 0;
+  // Ring geometry
+  const RING_SIZE = 72;
+  const RING_STROKE = 5;
+  const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+  const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+  const ringOffset = CIRCUMFERENCE * (1 - progress);
 
   const s = getStyles(colors);
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-
-        <LinearGradient colors={['#6C63FF', '#9B8FFF']} style={s.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <View style={s.headerTop}>
-            <View>
-              <Text style={s.greeting}>{greeting()} 👋</Text>
-              <Text style={s.date}>{todayLabel}</Text>
-            </View>
-            <TouchableOpacity style={s.addBtn} onPress={openCreate}>
-              <Text style={s.addBtnText}>+</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={s.progressArea}>
-            <View style={s.progressRow}>
-              <View style={s.progressBar}>
-                <View style={[s.progressFill, { width: `${progress * 100}%` }]} />
-              </View>
-              <Text style={s.progressLabel}>{completedHabits.length}/{habits.length}</Text>
-            </View>
-            <Text style={s.progressHint}>
-              {habits.length === 0 ? 'Add your first habit below'
-                : allDone ? '🎉 All done today!'
-                : `${habits.length - completedHabits.length} remaining`}
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Header: ring + greeting ──────────────────────────────── */}
+        <View style={s.header}>
+          {/* Left: progress ring */}
+          <Svg width={RING_SIZE} height={RING_SIZE}>
+            {/* Track */}
+            <Circle
+              cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
+              fill="none" stroke={colors.border} strokeWidth={RING_STROKE}
+            />
+            {/* Progress arc */}
+            <Circle
+              cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
+              fill="none" stroke={colors.primary} strokeWidth={RING_STROKE}
+              strokeLinecap="round"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={habits.length === 0 ? CIRCUMFERENCE : ringOffset}
+              rotation="-90"
+              origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
+            />
+          </Svg>
+          {/* Ring centre label — overlaid absolutely */}
+          <View style={s.ringLabel}>
+            <Text style={s.ringText}>
+              {habits.length === 0 ? '—' : `${completedHabits.length}/${habits.length}`}
             </Text>
           </View>
-        </LinearGradient>
 
+          {/* Right: greeting + streak */}
+          <View style={s.greetingBlock}>
+            <Text style={s.dateLabel}>{dateLabel}</Text>
+            <Text style={s.greeting}>{greeting()}</Text>
+            {overallStreak > 0 && (
+              <View style={s.streakPill}>
+                <Text style={s.streakText}>🔥 {overallStreak}-day streak</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Add button */}
+          <TouchableOpacity style={s.addBtn} onPress={openCreate}>
+            <Text style={s.addBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Header divider */}
+        <View style={s.divider} />
+
+        {/* ── Challenge card ───────────────────────────────────────── */}
         {challenge && !challenge.completed && (
           <View style={s.challengeCard}>
-            <Text style={s.challengeTitle}>🔥 3-Day Kickstart</Text>
+            <Text style={s.challengeTitle}>3-Day Kickstart</Text>
             <View style={s.challengeDays}>
               {Array.from({ length: challenge.days }).map((_, i) => {
-                // Build UTC date from the stored YYYY-MM-DD string to avoid
-                // timezone shifts (midnight local != midnight UTC on non-UTC zones).
-                const [y, mo, day] = challenge.startDate.split('-').map(Number);
-                const d = new Date(Date.UTC(y, mo - 1, day + i));
-                const key = dateKey(d);
-                const done = challenge.habitIds.every(hid => {
-                  const h = habits.find(h => h.id === hid);
-                  return h && countForDate(logs, hid, key) >= h.targetCount;
-                });
-                const isFuture = i + 1 > challengeDaysPassed;
+                const done = i < challengeStreak;
                 return (
-                  <View key={i} style={[s.dayDot, done && s.dayDotDone, isFuture && s.dayDotFuture]}>
-                    <Text style={[s.dayDotText, done && s.dayDotTextDone]}>{done ? '✓' : `D${i + 1}`}</Text>
+                  <View key={i} style={[s.dayDot, done && s.dayDotDone]}>
+                    {done
+                      ? <IconCheck color="#fff" size={14} />
+                      : <Text style={s.dayDotText}>D{i + 1}</Text>}
                   </View>
                 );
               })}
             </View>
-            <Text style={s.challengeHint}>Complete all habits each day to finish</Text>
+            <Text style={s.challengeHint}>Complete all habits each day</Text>
           </View>
         )}
 
         {challenge?.completed && (
           <View style={[s.challengeCard, s.challengeCardDone]}>
-            <Text style={s.challengeTitle}>🏆 Kickstart Complete!</Text>
-            <Text style={s.challengeHint}>You built the habit of building habits. Legend.</Text>
+            <Text style={s.challengeTitle}>Kickstart Complete</Text>
+            <Text style={s.challengeHint}>You built the habit of building habits.</Text>
           </View>
         )}
 
+        {/* ── Habit list ───────────────────────────────────────────── */}
         {habits.length === 0 ? (
           <View style={s.empty}>
-            <Text style={s.emptyEmoji}>🌱</Text>
+            <View style={s.emptyIconTile}>
+              <Text style={{ fontSize: 32 }}>+</Text>
+            </View>
             <Text style={s.emptyTitle}>No habits yet</Text>
-            <Text style={s.emptyHint}>Tap + to add your first habit and start building momentum.</Text>
+            <Text style={s.emptyHint}>Add your first habit and start building momentum.</Text>
             <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
               <Text style={s.emptyBtnText}>Add First Habit</Text>
             </TouchableOpacity>
@@ -197,18 +232,22 @@ export default function HomeScreen({ navigation }) {
               />
             ))}
             <TouchableOpacity style={s.addHabitRow} onPress={openCreate}>
-              <Text style={s.addHabitPlus}>+</Text>
+              <View style={s.addHabitIcon}>
+                <Text style={s.addHabitPlus}>+</Text>
+              </View>
               <Text style={s.addHabitText}>Add another habit</Text>
             </TouchableOpacity>
           </>
         )}
-
       </ScrollView>
 
+      {/* ── All-done celebration ─────────────────────────────────── */}
       <Modal transparent visible={showAllDone} animationType="fade">
         <View style={s.overlay}>
           <Animated.View style={[s.celebrateBox, { transform: [{ scale: celebrateScale }] }]}>
-            <Text style={{ fontSize: 56, marginBottom: SPACING.sm }}>🎉</Text>
+            <View style={s.celebrateIcon}>
+              <IconCheck color="#fff" size={32} />
+            </View>
             <Text style={s.celebrateTitle}>All done!</Text>
             <Text style={s.celebrateSub}>You crushed today. See you tomorrow.</Text>
           </Animated.View>
@@ -216,19 +255,22 @@ export default function HomeScreen({ navigation }) {
         <ConfettiOverlay visible={confetti} />
       </Modal>
 
+      {/* ── Challenge win ────────────────────────────────────────── */}
       <Modal transparent visible={showChallengeWin} animationType="slide">
         <View style={s.overlay}>
-          <LinearGradient colors={['#6C63FF', '#9B8FFF']} style={s.challengeWinBox}>
-            <Text style={{ fontSize: 64 }}>🏆</Text>
-            <Text style={s.winTitle}>3-Day Kickstart Complete!</Text>
+          <View style={s.challengeWinBox}>
+            <View style={[s.celebrateIcon, { width: 64, height: 64, borderRadius: 20 }]}>
+              <Text style={{ fontSize: 32 }}>🏆</Text>
+            </View>
+            <Text style={s.winTitle}>3-Day Kickstart{'\n'}Complete!</Text>
             <Text style={s.winSub}>You showed up 3 days in a row. That's how habits are born.</Text>
             <TouchableOpacity style={s.winBtn} onPress={() => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setShowChallengeWin(false);
             }}>
-              <Text style={s.winBtnText}>Claim Reward ✨</Text>
+              <Text style={s.winBtnText}>Claim Reward</Text>
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
         </View>
         <ConfettiOverlay visible={showChallengeWin} />
       </Modal>
@@ -240,54 +282,129 @@ function getStyles(colors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1 },
-    content: { paddingBottom: SPACING.xl },
+    content: { paddingBottom: 100 },
+
+    // Header
     header: {
-      paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.xl,
-      borderBottomLeftRadius: 28, borderBottomRightRadius: 28, marginBottom: SPACING.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.lg,
+      gap: SPACING.md,
+      position: 'relative',
     },
-    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.lg },
-    greeting: { fontSize: 22, fontWeight: '700', color: '#fff' },
-    date: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-    addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
-    addBtnText: { color: '#fff', fontSize: 24, fontWeight: '300', lineHeight: 28 },
-    progressArea: { gap: SPACING.xs },
-    progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    progressBar: { flex: 1, height: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4, overflow: 'hidden' },
-    progressFill: { height: '100%', backgroundColor: '#fff', borderRadius: 4 },
-    progressLabel: { color: '#fff', fontWeight: '700', fontSize: 13, minWidth: 36, textAlign: 'right' },
-    progressHint: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
+    ringLabel: {
+      position: 'absolute',
+      left: SPACING.lg,
+      top: SPACING.lg,
+      width: 72,
+      height: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ringText: { fontSize: 15, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+    greetingBlock: { flex: 1, marginLeft: 4 },
+    dateLabel: {
+      fontSize: 10, fontWeight: '700', letterSpacing: 1.5,
+      color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 4,
+    },
+    greeting: { fontSize: 22, fontWeight: '900', color: colors.text, letterSpacing: -0.5, lineHeight: 26 },
+    streakPill: {
+      marginTop: 8, alignSelf: 'flex-start',
+      backgroundColor: colors.text, borderRadius: RADIUS.full,
+      paddingHorizontal: 10, paddingVertical: 4,
+    },
+    streakText: { fontSize: 11, fontWeight: '700', color: colors.card },
+    addBtn: {
+      width: 40, height: 40, borderRadius: 12,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center',
+      alignSelf: 'flex-start',
+    },
+    addBtnText: { color: colors.card, fontSize: 22, fontWeight: '300', lineHeight: 26 },
+    divider: { height: 1.5, backgroundColor: colors.border, marginBottom: SPACING.md },
+
+    // Challenge card
     challengeCard: {
       marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
       backgroundColor: colors.card, borderRadius: RADIUS.lg, padding: SPACING.md,
-      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
-      borderLeftWidth: 4, borderLeftColor: colors.warning,
+      borderWidth: 1.5, borderColor: colors.border,
     },
-    challengeCardDone: { borderLeftColor: colors.success },
-    challengeTitle: { fontWeight: '700', fontSize: 15, color: colors.text, marginBottom: SPACING.sm },
+    challengeCardDone: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+    challengeTitle: {
+      fontWeight: '800', fontSize: 13, color: colors.text,
+      letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: SPACING.sm,
+    },
     challengeDays: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
-    dayDot: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-    dayDotDone: { backgroundColor: colors.success, borderColor: colors.success },
-    dayDotFuture: { opacity: 0.4 },
-    dayDotText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
-    dayDotTextDone: { color: '#fff' },
-    challengeHint: { fontSize: 12, color: colors.textSecondary },
+    dayDot: {
+      width: 40, height: 40, borderRadius: 20,
+      borderWidth: 2, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    dayDotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
+    dayDotText: { fontWeight: '700', color: colors.textSecondary, fontSize: 11 },
+    challengeHint: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
+
+    // Empty state
     empty: { alignItems: 'center', paddingTop: 60, paddingHorizontal: SPACING.xl },
-    emptyEmoji: { fontSize: 56, marginBottom: SPACING.md },
-    emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: SPACING.sm },
-    emptyHint: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: SPACING.xl },
-    emptyBtn: { backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.full },
-    emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-    addHabitRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: SPACING.lg, marginTop: SPACING.xs, paddingVertical: SPACING.md, gap: SPACING.sm },
-    addHabitPlus: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryLight, textAlign: 'center', lineHeight: 28, color: colors.primary, fontWeight: '700', fontSize: 18, overflow: 'hidden' },
-    addHabitText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
+    emptyIconTile: {
+      width: 64, height: 64, borderRadius: 18,
+      backgroundColor: colors.border,
+      alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md,
+    },
+    emptyTitle: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: SPACING.sm },
+    emptyHint: {
+      fontSize: 15, color: colors.textSecondary, textAlign: 'center',
+      lineHeight: 22, marginBottom: SPACING.xl,
+    },
+    emptyBtn: {
+      backgroundColor: colors.text, paddingVertical: 14,
+      paddingHorizontal: SPACING.xl, borderRadius: RADIUS.full,
+    },
+    emptyBtnText: { color: colors.card, fontWeight: '700', fontSize: 16 },
+
+    // Add row
+    addHabitRow: {
+      flexDirection: 'row', alignItems: 'center',
+      marginHorizontal: SPACING.lg, marginTop: SPACING.xs,
+      paddingVertical: SPACING.md, gap: SPACING.sm,
+    },
+    addHabitIcon: {
+      width: 28, height: 28, borderRadius: 8,
+      backgroundColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    addHabitPlus: { color: colors.textSecondary, fontWeight: '700', fontSize: 18, lineHeight: 22 },
+    addHabitText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
+
+    // Modals
     overlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center' },
-    celebrateBox: { backgroundColor: colors.card, borderRadius: RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: 280 },
-    celebrateTitle: { fontSize: 24, fontWeight: '800', color: colors.text, marginBottom: SPACING.xs },
+    celebrateBox: {
+      backgroundColor: colors.card, borderRadius: RADIUS.xl,
+      padding: SPACING.xl, alignItems: 'center', width: 280,
+    },
+    celebrateIcon: {
+      width: 52, height: 52, borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md,
+    },
+    celebrateTitle: { fontSize: 24, fontWeight: '900', color: colors.text, marginBottom: SPACING.xs },
     celebrateSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-    challengeWinBox: { borderRadius: RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: 320, gap: SPACING.md },
-    winTitle: { fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'center' },
-    winSub: { fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 22 },
-    winBtn: { backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.full, marginTop: SPACING.sm },
-    winBtnText: { color: colors.primary, fontWeight: '800', fontSize: 16 },
+    challengeWinBox: {
+      backgroundColor: colors.card, borderRadius: RADIUS.xl,
+      padding: SPACING.xl, alignItems: 'center', width: 320,
+      gap: SPACING.md, borderWidth: 1.5, borderColor: colors.primary,
+    },
+    winTitle: {
+      fontSize: 24, fontWeight: '900', color: colors.text,
+      textAlign: 'center', letterSpacing: -0.5,
+    },
+    winSub: { fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+    winBtn: {
+      backgroundColor: colors.text, paddingVertical: 14,
+      paddingHorizontal: SPACING.xl, borderRadius: RADIUS.full, marginTop: SPACING.sm,
+    },
+    winBtnText: { color: colors.card, fontWeight: '800', fontSize: 16 },
   });
 }
