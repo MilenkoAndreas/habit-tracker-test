@@ -9,7 +9,7 @@ import HabitCard from '../components/HabitCard';
 import ConfettiOverlay from '../components/ConfettiOverlay';
 import { IconCheck } from '../components/icons/index';
 import { useApp, useColors } from '../AppContext';
-import { countForDate, dateKey, calcStreak } from '../storage';
+import { countForDate, dateKey } from '../storage';
 import { SPACING, RADIUS } from '../theme';
 
 export default function HomeScreen({ navigation }) {
@@ -78,7 +78,7 @@ export default function HomeScreen({ navigation }) {
     } else if (!allDone) {
       prevAllDone.current = false;
     }
-  }, [allDone, loading, challenge, habits, logs, dispatch]);
+  }, [allDone, loading, challenge, habits, logs, dispatch, challengeStreak]);
 
   const handleHabitPress = (habit) => {
     const count = countForDate(logs, habit.id, today);
