@@ -213,7 +213,7 @@ export default function InsightsScreen() {
                   <View key={h.id}>
                     <View style={s.habitStreakRow}>
                       <View style={s.habitStreakTile}>
-                        {IconComp ? <IconComp color="#fff" size={16} /> : <Text style={{ fontSize: 14 }}>{h.emoji}</Text>}
+                        {IconComp ? <IconComp color={colors.card} size={16} /> : <Text style={{ fontSize: 14 }}>{h.emoji}</Text>}
                       </View>
                       <Text style={s.habitStreakName} numberOfLines={1}>{h.name}</Text>
                       <Text style={s.habitStreakCount}>{streak}d</Text>
