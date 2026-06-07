@@ -1,31 +1,36 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Animated, SafeAreaView, KeyboardAvoidingView, Platform,
+  Animated, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../AppContext';
+import { useAuth } from '../AuthContext';
+import { useColors } from '../AppContext';
 import { setOnboarded, dateKey } from '../storage';
 import { requestPermissions } from '../notifications';
-import { HABIT_COLORS, SPACING, RADIUS } from '../theme';
+import { pushSettings } from '../sync';
+import { SPACING, RADIUS } from '../theme';
+import { ICON_PICKER_ITEMS, ICON_MAP } from '../components/icons/index';
 
 // Step 0: explainer. Step 1: create habit. Step 2: challenge.
 const TOTAL_STEPS = 3;
 
 const HOW_IT_WORKS = [
-  { emoji: '➕', title: 'Add your habits', desc: 'Pick anything you want to do every day — exercise, reading, drinking water, whatever matters to you.' },
-  { emoji: '✅', title: 'Tap when done', desc: 'Each day, tap a habit to mark it complete. All done? You\'ll get a celebration and your streak grows.' },
-  { emoji: '📊', title: 'Track your progress', desc: 'See your streaks, history and stats. Consistency is the goal — Habit Tracker keeps score for you.' },
+  { num: '1', title: 'Add your habits', desc: 'Pick anything you want to do every day — exercise, reading, drinking water, whatever matters to you.' },
+  { num: '2', title: 'Tap when done', desc: 'Each day, tap a habit to mark it complete. All done? You\'ll get a celebration and your streak grows.' },
+  { num: '3', title: 'Track your progress', desc: 'See your streaks, history and stats. Consistency is the goal — Habit Tracker keeps score for you.' },
 ];
-
-const EMOJIS = ['💧','🏃','📚','🧘','😴','🥗','💪','🎯','✍️','🎸','🌿','🧠'];
 
 export default function OnboardingScreen({ navigation }) {
   const { dispatch } = useApp();
+  const { session } = useAuth();
+  const colors = useColors();
+  const s = getStyles(colors);
+
   const [step, setStep] = useState(0);
   const [habitName, setHabitName] = useState('');
-  const [emoji, setEmoji] = useState('🎯');
+  const [iconKey, setIconKey] = useState('run');
   const [type, setType] = useState('once');
   const [targetCount, setTargetCount] = useState(1);
   const fade = useRef(new Animated.Value(1)).current;
@@ -49,10 +54,10 @@ export default function OnboardingScreen({ navigation }) {
       const habit = {
         id: Date.now().toString(),
         name: habitName.trim(),
-        emoji,
+        emoji: iconKey,
         type,
         targetCount: type === 'volume' ? targetCount : 1,
-        color: HABIT_COLORS[0],
+        color: '#111111',
         createdAt: new Date().toISOString(),
       };
       dispatch({ type: 'ADD_HABIT', habit });
@@ -71,222 +76,247 @@ export default function OnboardingScreen({ navigation }) {
     }
 
     await setOnboarded();
+    if (session?.user?.id) {
+      pushSettings({ onboarded: true }, session.user.id).catch(() => {});
+    }
     navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   };
 
   return (
-    <LinearGradient colors={['#6C63FF', '#9B8FFF']} style={styles.gradient}>
-      <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+    <SafeAreaView style={s.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.container}>
 
-          <Animated.View style={[styles.content, { opacity: fade }]}>
+        <Animated.View style={[s.content, { opacity: fade }]}>
 
-            {/* ── Step 0: How it works ── */}
-            {step === 0 && (
-              <View style={styles.explainer}>
-                <Text style={styles.appIcon}>🚀</Text>
-                <Text style={styles.appName}>Habit Tracker</Text>
-                <Text style={styles.appTagline}>Your daily habit tracker</Text>
+          {/* ── Step 0: How it works ── */}
+          {step === 0 && (
+            <View style={{ flex: 1, justifyContent: 'space-between' }}>
+              <View>
+                <Text style={s.stepLabel}>Welcome</Text>
+                <Text style={s.heading}>Build habits that stick.</Text>
+                <Text style={s.subheading}>Three simple steps to a consistent routine.</Text>
 
-                <View style={styles.howList}>
+                <View>
                   {HOW_IT_WORKS.map((item, i) => (
-                    <View key={i} style={styles.howRow}>
-                      <View style={styles.howIconWrap}>
-                        <Text style={styles.howIcon}>{item.emoji}</Text>
+                    <View key={i} style={s.howCard}>
+                      <View style={s.howCardNum}>
+                        <Text style={s.howCardNumText}>{item.num}</Text>
                       </View>
-                      <View style={styles.howText}>
-                        <Text style={styles.howTitle}>{item.title}</Text>
-                        <Text style={styles.howDesc}>{item.desc}</Text>
-                      </View>
+                      <Text style={s.howCardTitle}>{item.title}</Text>
+                      <Text style={s.howCardDesc}>{item.desc}</Text>
                     </View>
                   ))}
                 </View>
+              </View>
 
-                <TouchableOpacity style={styles.btn} onPress={nextStep}>
-                  <Text style={styles.btnText}>Get Started →</Text>
+              <View>
+                <TouchableOpacity style={s.primaryBtn} onPress={nextStep}>
+                  <Text style={s.primaryBtnText}>Get Started</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
+          )}
 
-            {/* ── Step 1: Create first habit ── */}
-            {step === 1 && (
-              <View style={styles.form}>
-                <Text style={styles.title}>Your first habit</Text>
-                <Text style={styles.subtitle}>What do you want to build consistency around?</Text>
+          {/* ── Step 1: Create first habit ── */}
+          {step === 1 && (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: SPACING.xl }}>
+              <Text style={s.stepLabel}>Step 1 of 2</Text>
+              <Text style={s.heading}>Your first habit</Text>
+              <Text style={s.subheading}>What do you want to build consistency around?</Text>
 
-                <Text style={styles.label}>Choose an emoji</Text>
-                <View style={styles.emojiGrid}>
-                  {EMOJIS.map(e => (
+              <Text style={[s.stepLabel, { marginBottom: SPACING.sm }]}>Choose an icon</Text>
+              <View style={s.iconGrid}>
+                {ICON_PICKER_ITEMS.map(({ key, label, Component }) => {
+                  const selected = iconKey === key;
+                  return (
                     <TouchableOpacity
-                      key={e}
-                      style={[styles.emojiBtn, emoji === e && styles.emojiBtnSelected]}
-                      onPress={() => setEmoji(e)}
+                      key={key}
+                      style={[s.iconGridItem, selected && s.iconGridItemSelected]}
+                      onPress={() => setIconKey(key)}
                     >
-                      <Text style={styles.emojiOption}>{e}</Text>
+                      <Component color={selected ? colors.card : colors.text} size={20} />
+                      <Text style={[s.iconLabel, selected && s.iconLabelSelected]}>{label}</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  );
+                })}
+              </View>
 
-                <Text style={styles.label}>Habit name</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Drink 8 glasses of water"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={habitName}
-                  onChangeText={setHabitName}
-                  returnKeyType="done"
-                />
+              <Text style={[s.stepLabel, { marginBottom: SPACING.sm }]}>Habit name</Text>
+              <TextInput
+                style={s.nameInput}
+                placeholder="e.g. Drink 8 glasses of water"
+                placeholderTextColor={colors.textSecondary}
+                value={habitName}
+                onChangeText={setHabitName}
+                returnKeyType="done"
+              />
 
-                <Text style={styles.label}>Type</Text>
-                <View style={styles.typeRow}>
-                  {[['once', 'Once per day'], ['volume', 'Multiple times']].map(([val, label]) => (
+              <Text style={[s.stepLabel, { marginBottom: SPACING.sm }]}>Type</Text>
+              <View style={s.typeRow}>
+                {[['once', 'Once per day', 'Simple done / not done'], ['volume', 'Multiple times', 'Track a count goal']].map(([val, label, hint]) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[s.typeCard, type === val && s.typeCardSelected]}
+                    onPress={() => setType(val)}
+                  >
+                    <Text style={[s.typeCardLabel, type === val && s.typeCardLabelSelected]}>{label}</Text>
+                    <Text style={s.typeCardHint}>{hint}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {type === 'volume' && (
+                <View style={{ marginBottom: SPACING.md }}>
+                  <Text style={[s.stepLabel, { marginBottom: SPACING.sm }]}>Times per day: {targetCount}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
                     <TouchableOpacity
-                      key={val}
-                      style={[styles.typeBtn, type === val && styles.typeBtnSelected]}
-                      onPress={() => setType(val)}
+                      onPress={() => setTargetCount(Math.max(2, targetCount - 1))}
+                      style={{ backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border, width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Text style={[styles.typeBtnText, type === val && styles.typeBtnTextSelected]}>{label}</Text>
+                      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>−</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-
-                {type === 'volume' && (
-                  <View style={styles.countRow}>
-                    <Text style={styles.label}>Times per day: {targetCount}</Text>
-                    <View style={styles.counter}>
-                      <TouchableOpacity onPress={() => setTargetCount(Math.max(2, targetCount - 1))} style={styles.counterBtn}>
-                        <Text style={styles.counterBtnText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.counterVal}>{targetCount}</Text>
-                      <TouchableOpacity onPress={() => setTargetCount(Math.min(20, targetCount + 1))} style={styles.counterBtn}>
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700', minWidth: 32, textAlign: 'center' }}>{targetCount}</Text>
+                    <TouchableOpacity
+                      onPress={() => setTargetCount(Math.min(20, targetCount + 1))}
+                      style={{ backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border, width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>+</Text>
+                    </TouchableOpacity>
                   </View>
-                )}
+                </View>
+              )}
 
-                <TouchableOpacity
-                  style={[styles.btn, !habitName.trim() && styles.btnDisabled]}
-                  onPress={nextStep}
-                  disabled={!habitName.trim()}
-                >
-                  <Text style={styles.btnText}>Next</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              <TouchableOpacity
+                style={[s.primaryBtn, !habitName.trim() && { opacity: 0.4 }]}
+                onPress={nextStep}
+                disabled={!habitName.trim()}
+              >
+                <Text style={s.primaryBtnText}>Next</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
 
-            {/* ── Step 2: Challenge ── */}
-            {step === 2 && (
-              <View style={styles.introSlide}>
-                <Text style={styles.slideEmoji}>🔥</Text>
-                <Text style={styles.slideTitle}>3-Day Kickstart</Text>
-                <Text style={styles.slideDesc}>
+          {/* ── Step 2: Challenge ── */}
+          {step === 2 && (
+            <View style={{ flex: 1, justifyContent: 'space-between' }}>
+              <View>
+                <Text style={s.stepLabel}>Step 2 of 2</Text>
+                <Text style={s.heading}>3-Day Kickstart</Text>
+                <Text style={s.subheading}>
                   Complete your habits for 3 days in a row and claim your first achievement. Daily reminders will keep you on track.
                 </Text>
-                <View style={styles.challengeCard}>
-                  <Text style={styles.challengeRow}>Day 1  · Complete all habits</Text>
-                  <Text style={styles.challengeRow}>Day 2  · Keep the streak going</Text>
-                  <Text style={styles.challengeRow}>Day 3  · Claim your reward 🏆</Text>
+
+                <View style={s.howCard}>
+                  <Text style={[s.howCardTitle, { marginBottom: SPACING.sm }]}>Your challenge</Text>
+                  {['Day 1  · Complete all habits', 'Day 2  · Keep the streak going', 'Day 3  · Claim your reward'].map((row, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: i < 2 ? SPACING.sm : 0 }}>
+                      <View style={s.howCardNum}>
+                        <Text style={s.howCardNumText}>{i + 1}</Text>
+                      </View>
+                      <Text style={s.howCardDesc}>{row.split('  · ')[1]}</Text>
+                    </View>
+                  ))}
                 </View>
-                <TouchableOpacity style={styles.btn} onPress={finishOnboarding}>
-                  <Text style={styles.btnText}>Start Challenge</Text>
+              </View>
+
+              <View>
+                <TouchableOpacity style={s.primaryBtn} onPress={finishOnboarding}>
+                  <Text style={s.primaryBtnText}>Start Challenge</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.skipBtn} onPress={finishOnboarding}>
+                  <Text style={s.skipBtnText}>Skip for now</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
+          )}
 
-          </Animated.View>
+        </Animated.View>
 
-          {/* Progress dots */}
-          <View style={styles.dots}>
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-              <View key={i} style={[styles.dot, i === step && styles.dotActive]} />
-            ))}
-          </View>
+        {/* Progress dots */}
+        <View style={s.dots}>
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <View key={i} style={[s.dot, i === step && s.dotActive]} />
+          ))}
+        </View>
 
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  safe: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: SPACING.lg, justifyContent: 'center' },
+function getStyles(colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1 },
+    content: {
+      flex: 1, padding: SPACING.lg, paddingTop: SPACING.xl,
+      justifyContent: 'space-between',
+    },
 
-  // Explainer screen
-  explainer: { alignItems: 'center', paddingBottom: SPACING.md },
-  appIcon: { fontSize: 64, marginBottom: SPACING.sm },
-  appName: { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
-  appTagline: { fontSize: 15, color: 'rgba(255,255,255,0.7)', marginBottom: SPACING.xl, marginTop: 4 },
-  howList: { width: '100%', gap: SPACING.md, marginBottom: SPACING.xl },
-  howRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md, backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: RADIUS.lg, padding: SPACING.md },
-  howIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  howIcon: { fontSize: 22 },
-  howText: { flex: 1 },
-  howTitle: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 3 },
-  howDesc: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 19 },
+    stepLabel: {
+      fontSize: 10, fontWeight: '700', letterSpacing: 1.5,
+      textTransform: 'uppercase', color: colors.textSecondary, marginBottom: SPACING.md,
+    },
+    heading: {
+      fontSize: 28, fontWeight: '900', color: colors.text,
+      letterSpacing: -0.5, lineHeight: 34, marginBottom: SPACING.sm,
+    },
+    subheading: {
+      fontSize: 16, color: colors.textSecondary, lineHeight: 24, fontWeight: '500',
+      marginBottom: SPACING.xl,
+    },
 
-  // Create habit form
-  form: {},
-  title: { fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: SPACING.sm },
-  subtitle: { fontSize: 15, color: 'rgba(255,255,255,0.8)', textAlign: 'center', lineHeight: 22, marginBottom: SPACING.md },
-  label: { color: 'rgba(255,255,255,0.9)', fontWeight: '600', marginBottom: SPACING.sm, marginTop: SPACING.md },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: SPACING.sm,
-  },
-  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.sm },
-  emojiBtn: { padding: 8, borderRadius: RADIUS.sm, backgroundColor: 'rgba(255,255,255,0.15)' },
-  emojiBtnSelected: { backgroundColor: 'rgba(255,255,255,0.4)' },
-  emojiOption: { fontSize: 24 },
-  typeRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.sm },
-  typeBtn: { flex: 1, padding: SPACING.sm, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center' },
-  typeBtnSelected: { backgroundColor: '#fff' },
-  typeBtnText: { color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
-  typeBtnTextSelected: { color: '#6C63FF' },
-  countRow: { marginBottom: SPACING.sm },
-  counter: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginTop: SPACING.sm },
-  counterBtn: { backgroundColor: 'rgba(255,255,255,0.25)', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  counterBtnText: { color: '#fff', fontSize: 22, fontWeight: '600', lineHeight: 26 },
-  counterVal: { color: '#fff', fontSize: 22, fontWeight: '700', minWidth: 32, textAlign: 'center' },
+    howCard: {
+      backgroundColor: colors.card, borderRadius: RADIUS.lg,
+      padding: SPACING.md, borderWidth: 1.5, borderColor: colors.border,
+      marginBottom: SPACING.sm,
+    },
+    howCardTitle: { fontSize: 15, fontWeight: '800', color: colors.text, marginBottom: 3 },
+    howCardDesc: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, fontWeight: '500' },
+    howCardNum: {
+      width: 28, height: 28, borderRadius: 8,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center',
+      marginBottom: SPACING.sm,
+    },
+    howCardNumText: { fontSize: 13, fontWeight: '900', color: colors.card },
 
-  // Challenge slide wrapper
-  introSlide: { alignItems: 'center', paddingBottom: SPACING.xl },
-  slideEmoji: { fontSize: 88, marginBottom: SPACING.lg },
-  slideTitle: { fontSize: 34, fontWeight: '800', color: '#fff', textAlign: 'center', lineHeight: 42, marginBottom: SPACING.md },
-  slideDesc: { fontSize: 17, color: 'rgba(255,255,255,0.82)', textAlign: 'center', lineHeight: 26, marginBottom: SPACING.xl, paddingHorizontal: SPACING.sm },
+    iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
+    iconGridItem: {
+      width: '18%', aspectRatio: 1, borderRadius: 12,
+      backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center', gap: 3,
+    },
+    iconGridItemSelected: { backgroundColor: colors.text, borderColor: colors.text },
+    iconLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
+    iconLabelSelected: { color: colors.card },
 
-  // Challenge card
-  challengeCard: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    width: '100%',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xl,
-  },
-  challengeRow: { color: '#fff', fontSize: 15, fontWeight: '500' },
+    nameInput: {
+      backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SPACING.md,
+      fontSize: 18, fontWeight: '700', color: colors.text,
+      borderWidth: 1.5, borderColor: colors.border, marginBottom: SPACING.md,
+    },
 
-  // Shared button
-  btn: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.full,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#6C63FF', fontWeight: '800', fontSize: 17 },
+    typeRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md },
+    typeCard: {
+      flex: 1, borderWidth: 1.5, borderColor: colors.border,
+      borderRadius: RADIUS.md, padding: SPACING.md, backgroundColor: colors.card,
+    },
+    typeCardSelected: { borderColor: colors.text },
+    typeCardLabel: { fontWeight: '700', fontSize: 14, color: colors.textSecondary, marginBottom: 3 },
+    typeCardLabelSelected: { color: colors.text },
+    typeCardHint: { fontSize: 11, color: colors.textSecondary, fontWeight: '500' },
 
-  // Progress dots
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingBottom: SPACING.xl },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.35)' },
-  dotActive: { backgroundColor: '#fff', width: 24 },
-});
+    dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: SPACING.lg },
+    dot: { width: 8, height: 8, borderRadius: 4, borderWidth: 2, borderColor: colors.border },
+    dotActive: { backgroundColor: colors.text, borderColor: colors.text },
+
+    primaryBtn: {
+      backgroundColor: colors.text, paddingVertical: 16,
+      borderRadius: RADIUS.full, alignItems: 'center', marginBottom: SPACING.md,
+    },
+    primaryBtnText: { fontSize: 16, fontWeight: '800', color: colors.card },
+    skipBtn: { alignItems: 'center', paddingVertical: 8 },
+    skipBtnText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
+  });
+}
