@@ -6,22 +6,22 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useApp, useColors } from '../AppContext';
 import { scheduleHabitReminder, requestPermissions } from '../notifications';
-import { HABIT_COLORS, SPACING, RADIUS } from '../theme';
-
-const EMOJIS = ['🎯','💧','🏃','📚','🧘','😴','🥗','💪','✍️','🎸','🌿','🧠','🚴','🏊','🧗','🎨','🧹','📝','🥤','🌅'];
+import { SPACING, RADIUS } from '../theme';
+import { ICON_PICKER_ITEMS, ICON_MAP, IconCheck } from '../components/icons/index';
 
 export default function CreateHabitScreen({ navigation, route }) {
   const editHabit = route.params?.editHabit ?? null;
   const isEdit = editHabit !== null;
-  const { state, dispatch } = useApp();
+  const { dispatch } = useApp();
   const colors = useColors();
   const s = getStyles(colors);
 
   const [name, setName] = useState(editHabit?.name ?? '');
-  const [emoji, setEmoji] = useState(editHabit?.emoji ?? '🎯');
+  // Default icon key; fall back gracefully if editing a legacy emoji habit
+  const defaultIcon = ICON_MAP[editHabit?.emoji] ? editHabit.emoji : 'run';
+  const [iconKey, setIconKey] = useState(defaultIcon);
   const [type, setType] = useState(editHabit?.type ?? 'once');
   const [targetCount, setTargetCount] = useState(editHabit?.targetCount ?? 3);
-  const [color, setColor] = useState(editHabit?.color ?? HABIT_COLORS[0]);
   const [reminder, setReminder] = useState(editHabit?.reminder ?? { enabled: false, hour: 9, minute: 0 });
 
   const nextMinute = (m) => (Math.floor(m / 5) * 5 + 5) % 60;
@@ -51,14 +51,13 @@ export default function CreateHabitScreen({ navigation, route }) {
     const habit = {
       id: isEdit ? editHabit.id : Date.now().toString(),
       name: name.trim(),
-      emoji,
+      emoji: iconKey,      // stores icon key e.g. 'run', 'book'
       type,
       targetCount: type === 'volume' ? targetCount : 1,
-      color,
+      color: '#111111',    // kept for sync compat; no longer displayed
       reminder,
       createdAt: isEdit ? editHabit.createdAt : new Date().toISOString(),
     };
-
     if (isEdit) {
       dispatch({ type: 'UPDATE_HABIT', habit });
     } else {
@@ -67,6 +66,8 @@ export default function CreateHabitScreen({ navigation, route }) {
     scheduleHabitReminder(habit).catch(() => {});
     navigation.goBack();
   };
+
+  const SelectedIconComponent = ICON_MAP[iconKey];
 
   return (
     <SafeAreaView style={s.safe}>
@@ -83,19 +84,25 @@ export default function CreateHabitScreen({ navigation, route }) {
 
         <ScrollView contentContainerStyle={s.form} keyboardShouldPersistTaps="handled">
 
+          {/* Icon picker */}
           <Text style={s.label}>Icon</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.emojiScroll}>
-            {EMOJIS.map(e => (
-              <TouchableOpacity
-                key={e}
-                style={[s.emojiBtn, emoji === e && { backgroundColor: color + '33', borderColor: color }]}
-                onPress={() => setEmoji(e)}
-              >
-                <Text style={{ fontSize: 26 }}>{e}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={s.iconGrid}>
+            {ICON_PICKER_ITEMS.map(({ key, label, Component }) => {
+              const selected = iconKey === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[s.iconGridItem, selected && s.iconGridItemSelected]}
+                  onPress={() => { setIconKey(key); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                >
+                  <Component color={selected ? '#ffffff' : colors.text} size={22} />
+                  <Text style={[s.iconLabel, selected && s.iconLabelSelected]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
+          {/* Name */}
           <Text style={s.label}>Name</Text>
           <TextInput
             style={s.input}
@@ -107,92 +114,87 @@ export default function CreateHabitScreen({ navigation, route }) {
             autoFocus={!isEdit}
           />
 
+          {/* Type */}
           <Text style={s.label}>Type</Text>
           <View style={s.typeRow}>
-            {[['once', '☑️ Once per day', 'Tap once to complete'], ['volume', '🔢 Volume', 'Tap multiple times']].map(([val, label, hint]) => (
+            {[
+              ['once', 'Once per day', 'Tap once to complete'],
+              ['volume', 'Volume', 'Tap multiple times'],
+            ].map(([val, label, hint]) => (
               <TouchableOpacity
                 key={val}
-                style={[s.typeCard, type === val && { borderColor: color, backgroundColor: color + '11' }]}
+                style={[s.typeCard, type === val && s.typeCardSelected]}
                 onPress={() => setType(val)}
               >
-                <Text style={[s.typeCardLabel, type === val && { color }]}>{label}</Text>
+                <Text style={[s.typeCardLabel, type === val && s.typeCardLabelSelected]}>{label}</Text>
                 <Text style={s.typeCardHint}>{hint}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {/* Volume count */}
           {type === 'volume' && (
             <View>
               <Text style={s.label}>Times per day</Text>
               <View style={s.counter}>
-                <TouchableOpacity onPress={() => setTargetCount(Math.max(2, targetCount - 1))} style={[s.counterBtn, { borderColor: color }]}>
-                  <Text style={[s.counterBtnText, { color }]}>−</Text>
+                <TouchableOpacity onPress={() => setTargetCount(Math.max(2, targetCount - 1))} style={s.counterBtn}>
+                  <Text style={s.counterBtnText}>−</Text>
                 </TouchableOpacity>
                 <Text style={s.counterVal}>{targetCount}</Text>
-                <TouchableOpacity onPress={() => setTargetCount(Math.min(30, targetCount + 1))} style={[s.counterBtn, { borderColor: color }]}>
-                  <Text style={[s.counterBtnText, { color }]}>+</Text>
+                <TouchableOpacity onPress={() => setTargetCount(Math.min(30, targetCount + 1))} style={s.counterBtn}>
+                  <Text style={s.counterBtnText}>+</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
-          <Text style={s.label}>Color</Text>
-          <View style={s.colorRow}>
-            {HABIT_COLORS.map(c => (
-              <TouchableOpacity
-                key={c}
-                style={[s.colorDot, { backgroundColor: c }, color === c && s.colorDotSelected]}
-                onPress={() => setColor(c)}
-              />
-            ))}
-          </View>
-
+          {/* Reminder */}
           <Text style={s.label}>Reminder</Text>
           <View style={s.reminderCard}>
             <View style={s.reminderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
-                <Text style={{ fontSize: 22 }}>🔔</Text>
-                <View>
-                  <Text style={s.reminderTitle}>Daily Reminder</Text>
-                  <Text style={s.reminderDesc}>{reminder.enabled ? formatTime(reminder.hour, reminder.minute) : 'Off'}</Text>
-                </View>
+              <View>
+                <Text style={s.reminderTitle}>Daily Reminder</Text>
+                <Text style={s.reminderDesc}>{reminder.enabled ? formatTime(reminder.hour, reminder.minute) : 'Off'}</Text>
               </View>
               <Switch
                 value={reminder.enabled}
                 onValueChange={toggleReminder}
-                trackColor={{ false: colors.border, true: color }}
-                thumbColor='#fff'
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#fff"
               />
             </View>
             {reminder.enabled && (
               <View style={s.timePicker}>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: color }]} onPress={() => setReminder(r => ({ ...r, hour: (r.hour + 23) % 24 }))}>
-                  <Text style={[s.stepBtnText, { color }]}>−</Text>
+                <TouchableOpacity style={s.stepBtn} onPress={() => setReminder(r => ({ ...r, hour: (r.hour + 23) % 24 }))}>
+                  <Text style={s.stepBtnText}>−</Text>
                 </TouchableOpacity>
                 <Text style={s.timeUnit}>{reminder.hour.toString().padStart(2, '0')}</Text>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: color }]} onPress={() => setReminder(r => ({ ...r, hour: (r.hour + 1) % 24 }))}>
-                  <Text style={[s.stepBtnText, { color }]}>+</Text>
+                <TouchableOpacity style={s.stepBtn} onPress={() => setReminder(r => ({ ...r, hour: (r.hour + 1) % 24 }))}>
+                  <Text style={s.stepBtnText}>+</Text>
                 </TouchableOpacity>
                 <Text style={s.timeSep}>:</Text>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: color }]} onPress={() => setReminder(r => ({ ...r, minute: prevMinute(r.minute) }))}>
-                  <Text style={[s.stepBtnText, { color }]}>−</Text>
+                <TouchableOpacity style={s.stepBtn} onPress={() => setReminder(r => ({ ...r, minute: prevMinute(r.minute) }))}>
+                  <Text style={s.stepBtnText}>−</Text>
                 </TouchableOpacity>
                 <Text style={s.timeUnit}>{reminder.minute.toString().padStart(2, '0')}</Text>
-                <TouchableOpacity style={[s.stepBtn, { borderColor: color }]} onPress={() => setReminder(r => ({ ...r, minute: nextMinute(r.minute) }))}>
-                  <Text style={[s.stepBtnText, { color }]}>+</Text>
+                <TouchableOpacity style={s.stepBtn} onPress={() => setReminder(r => ({ ...r, minute: nextMinute(r.minute) }))}>
+                  <Text style={s.stepBtnText}>+</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
+          {/* Preview */}
           <Text style={s.label}>Preview</Text>
-          <View style={[s.preview, { borderLeftColor: color }]}>
-            <Text style={{ fontSize: 26 }}>{emoji}</Text>
-            <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+          <View style={s.preview}>
+            <View style={s.previewTile}>
+              {SelectedIconComponent && <SelectedIconComponent color="#ffffff" size={20} />}
+            </View>
+            <View style={{ flex: 1 }}>
               <Text style={s.previewName}>{name || 'Your habit name'}</Text>
               <Text style={s.previewType}>{type === 'volume' ? `${targetCount}× per day` : 'Once per day'}</Text>
             </View>
-            <View style={[s.previewCheck, { borderColor: color }]} />
+            <View style={s.previewCheck} />
           </View>
 
         </ScrollView>
@@ -207,70 +209,91 @@ function getStyles(colors) {
     topBar: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-      backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border,
+      backgroundColor: colors.card, borderBottomWidth: 1.5, borderBottomColor: colors.border,
     },
-    cancel: { color: colors.textSecondary, fontSize: 16 },
-    title: { fontWeight: '700', fontSize: 17, color: colors.text },
-    save: { color: colors.primary, fontWeight: '700', fontSize: 16 },
+    cancel: { color: colors.textSecondary, fontSize: 16, fontWeight: '600' },
+    title: { fontWeight: '800', fontSize: 17, color: colors.text },
+    save: { color: colors.primary, fontWeight: '800', fontSize: 16 },
     saveDisabled: { opacity: 0.35 },
     form: { padding: SPACING.lg, paddingBottom: 60 },
     label: {
-      fontWeight: '600', color: colors.textSecondary, fontSize: 13,
+      fontWeight: '700', color: colors.textSecondary, fontSize: 10,
       marginBottom: SPACING.sm, marginTop: SPACING.md,
-      textTransform: 'uppercase', letterSpacing: 0.5,
+      textTransform: 'uppercase', letterSpacing: 1.5,
     },
-    emojiScroll: { marginBottom: SPACING.sm },
-    emojiBtn: {
-      marginRight: SPACING.sm, padding: 8, borderRadius: RADIUS.md,
-      borderWidth: 2, borderColor: 'transparent', backgroundColor: colors.card,
+    iconGrid: {
+      flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.sm,
     },
+    iconGridItem: {
+      width: '18%', aspectRatio: 1, borderRadius: 12,
+      backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center', gap: 3,
+    },
+    iconGridItemSelected: {
+      backgroundColor: colors.text, borderColor: colors.text,
+    },
+    iconLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
+    iconLabelSelected: { color: '#fff' },
     input: {
       backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SPACING.md,
-      fontSize: 16, color: colors.text, borderWidth: 1, borderColor: colors.border,
-      marginBottom: SPACING.sm,
+      fontSize: 16, fontWeight: '600', color: colors.text,
+      borderWidth: 1.5, borderColor: colors.border, marginBottom: SPACING.sm,
     },
     typeRow: { flexDirection: 'row', gap: SPACING.sm },
     typeCard: {
-      flex: 1, borderWidth: 2, borderColor: colors.border,
+      flex: 1, borderWidth: 1.5, borderColor: colors.border,
       borderRadius: RADIUS.md, padding: SPACING.md, backgroundColor: colors.card,
     },
-    typeCardLabel: { fontWeight: '600', fontSize: 14, color: colors.text, marginBottom: 4 },
-    typeCardHint: { fontSize: 12, color: colors.textSecondary },
-    counter: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xl, marginBottom: SPACING.sm },
-    counterBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-    counterBtnText: { fontSize: 22, fontWeight: '600', lineHeight: 26 },
-    counterVal: { fontSize: 28, fontWeight: '800', color: colors.text, minWidth: 40, textAlign: 'center' },
-    colorRow: { flexDirection: 'row', gap: 12, marginBottom: SPACING.sm },
-    colorDot: { width: 32, height: 32, borderRadius: 16 },
-    colorDotSelected: {
-      borderWidth: 3, borderColor: '#fff',
-      shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4,
-      shadowOffset: { width: 0, height: 2 }, elevation: 4,
+    typeCardSelected: { borderColor: colors.text, backgroundColor: colors.background },
+    typeCardLabel: { fontWeight: '700', fontSize: 14, color: colors.textSecondary, marginBottom: 4 },
+    typeCardLabelSelected: { color: colors.text },
+    typeCardHint: { fontSize: 11, color: colors.textSecondary },
+    counter: {
+      flexDirection: 'row', alignItems: 'center',
+      gap: SPACING.xl, marginBottom: SPACING.sm,
     },
+    counterBtn: {
+      width: 40, height: 40, borderRadius: 20,
+      borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    counterBtnText: { fontSize: 22, fontWeight: '600', color: colors.text, lineHeight: 26 },
+    counterVal: { fontSize: 28, fontWeight: '900', color: colors.text, minWidth: 40, textAlign: 'center' },
     reminderCard: {
       backgroundColor: colors.card, borderRadius: RADIUS.md,
-      padding: SPACING.md, borderWidth: 1, borderColor: colors.border,
+      padding: SPACING.md, borderWidth: 1.5, borderColor: colors.border,
     },
     reminderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    reminderTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-    reminderDesc: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    reminderTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+    reminderDesc: { fontSize: 11, color: colors.textSecondary, marginTop: 2, fontWeight: '600' },
     timePicker: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 10, marginTop: SPACING.md, paddingTop: SPACING.md,
       borderTopWidth: 1, borderTopColor: colors.border,
     },
-    stepBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-    stepBtnText: { fontSize: 20, fontWeight: '600', lineHeight: 24 },
-    timeUnit: { fontSize: 22, fontWeight: '700', color: colors.text, minWidth: 36, textAlign: 'center' },
+    stepBtn: {
+      width: 36, height: 36, borderRadius: 18,
+      borderWidth: 1.5, borderColor: colors.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    stepBtnText: { fontSize: 20, fontWeight: '600', color: colors.text, lineHeight: 24 },
+    timeUnit: { fontSize: 22, fontWeight: '900', color: colors.text, minWidth: 36, textAlign: 'center' },
     timeSep: { fontSize: 22, fontWeight: '700', color: colors.textSecondary },
     preview: {
       flexDirection: 'row', alignItems: 'center',
       backgroundColor: colors.card, borderRadius: RADIUS.lg,
-      padding: SPACING.md, borderLeftWidth: 4,
-      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+      padding: SPACING.md, borderWidth: 1.5, borderColor: colors.border, gap: SPACING.sm,
     },
-    previewName: { fontSize: 16, fontWeight: '600', color: colors.text },
-    previewType: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-    previewCheck: { width: 26, height: 26, borderRadius: 8, borderWidth: 2 },
+    previewTile: {
+      width: 38, height: 38, borderRadius: 10,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    previewName: { fontSize: 15, fontWeight: '700', color: colors.text },
+    previewType: { fontSize: 11, color: colors.textSecondary, marginTop: 2, fontWeight: '600' },
+    previewCheck: {
+      width: 24, height: 24, borderRadius: 7,
+      borderWidth: 2, borderColor: colors.border,
+    },
   });
 }
