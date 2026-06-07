@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '../AppContext';
-import { SPACING, RADIUS } from '../theme';
+import { SPACING } from '../theme';
 import { ICON_MAP, IconCheck } from './icons/index';
 
 export default function HabitCard({ habit, count, onPress, onLongPress }) {
@@ -25,7 +25,6 @@ export default function HabitCard({ habit, count, onPress, onLongPress }) {
 
   // Render SVG icon if key known, else fall back to emoji text
   const IconComponent = ICON_MAP[habit.emoji];
-  const iconColor = '#ffffff';
   const tileBg = done ? colors.primary : colors.text;
 
   return (
@@ -39,7 +38,7 @@ export default function HabitCard({ habit, count, onPress, onLongPress }) {
         {/* Icon tile */}
         <View style={[s.iconTile, { backgroundColor: tileBg }]}>
           {IconComponent ? (
-            <IconComponent color={iconColor} size={20} />
+            <IconComponent color="#ffffff" size={20} />
           ) : (
             <Text style={s.emoji}>{habit.emoji}</Text>
           )}
