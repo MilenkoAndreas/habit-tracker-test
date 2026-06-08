@@ -25,7 +25,7 @@ export default function HabitCard({ habit, count, onPress, onLongPress }) {
 
   // Render SVG icon if key known, else fall back to emoji text
   const IconComponent = ICON_MAP[habit.emoji];
-  const tileBg = done ? colors.primary : colors.text;
+  const tileBg = done ? colors.primary : '#111111';
 
   return (
     <Animated.View style={{ transform: [{ scale }], marginHorizontal: SPACING.lg }}>

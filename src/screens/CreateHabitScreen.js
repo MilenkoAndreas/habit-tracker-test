@@ -286,7 +286,7 @@ function getStyles(colors) {
     },
     previewTile: {
       width: 38, height: 38, borderRadius: 10,
-      backgroundColor: colors.text,
+      backgroundColor: '#111111',
       alignItems: 'center', justifyContent: 'center',
     },
     previewName: { fontSize: 15, fontWeight: '700', color: colors.text },
