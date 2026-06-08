@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, KeyboardAvoidingView, Platform, Alert, Switch,
@@ -14,7 +14,7 @@ export default function CreateHabitScreen({ navigation, route }) {
   const isEdit = editHabit !== null;
   const { dispatch } = useApp();
   const colors = useColors();
-  const s = getStyles(colors);
+  const s = useMemo(() => getStyles(colors), [colors]);
 
   const [name, setName] = useState(editHabit?.name ?? '');
   // Default icon key; fall back gracefully if editing a legacy emoji habit
@@ -95,7 +95,7 @@ export default function CreateHabitScreen({ navigation, route }) {
                   style={[s.iconGridItem, selected && s.iconGridItemSelected]}
                   onPress={() => { setIconKey(key); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                 >
-                  <Component color={selected ? '#ffffff' : colors.text} size={22} />
+                  <Component color={selected ? '#ffffff' : colors.text} size={26} />
                   <Text style={[s.iconLabel, selected && s.iconLabelSelected]}>{label}</Text>
                 </TouchableOpacity>
               );
@@ -225,12 +225,12 @@ function getStyles(colors) {
       flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.sm,
     },
     iconGridItem: {
-      width: '18%', aspectRatio: 1, borderRadius: 12,
+      width: '18%', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 12,
       backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border,
-      alignItems: 'center', justifyContent: 'center', gap: 3,
+      alignItems: 'center', justifyContent: 'center', gap: 5,
     },
     iconGridItemSelected: {
-      backgroundColor: colors.text, borderColor: colors.text,
+      backgroundColor: colors.primary, borderColor: colors.primary,
     },
     iconLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
     iconLabelSelected: { color: '#fff' },

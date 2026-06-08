@@ -134,7 +134,7 @@ export default function OnboardingScreen({ navigation }) {
                       style={[s.iconGridItem, selected && s.iconGridItemSelected]}
                       onPress={() => setIconKey(key)}
                     >
-                      <Component color={selected ? colors.card : colors.text} size={20} />
+                      <Component color={selected ? '#ffffff' : colors.text} size={24} />
                       <Text style={[s.iconLabel, selected && s.iconLabelSelected]}>{label}</Text>
                     </TouchableOpacity>
                   );
@@ -283,13 +283,13 @@ function getStyles(colors) {
 
     iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
     iconGridItem: {
-      width: '18%', aspectRatio: 1, borderRadius: 12,
+      width: '18%', paddingVertical: 12, paddingHorizontal: 4, borderRadius: 12,
       backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border,
-      alignItems: 'center', justifyContent: 'center', gap: 3,
+      alignItems: 'center', justifyContent: 'center', gap: 5,
     },
-    iconGridItemSelected: { backgroundColor: colors.text, borderColor: colors.text },
+    iconGridItemSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
     iconLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary },
-    iconLabelSelected: { color: colors.card },
+    iconLabelSelected: { color: '#ffffff' },
 
     nameInput: {
       backgroundColor: colors.card, borderRadius: RADIUS.md, padding: SPACING.md,

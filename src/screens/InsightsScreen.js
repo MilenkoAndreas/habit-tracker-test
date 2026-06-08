@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import Svg, { Rect, Text as SvgText, Line } from 'react-native-svg';
 import { useApp, useColors } from '../AppContext';
-import { calcStreak, weeklyStats, countForDate, dateKey } from '../storage';
+import { calcStreak, weeklyStats, countForDate, dateKey, calcOverallStreak, calcBestStreak } from '../storage';
 import { SPACING, RADIUS } from '../theme';
-import { ICON_MAP } from '../components/icons/index';
+import { ICON_MAP, IconBarChart } from '../components/icons/index';
 import { fetchCoachingInsight, fetchReflection } from '../ai';
 
 const { width } = Dimensions.get('window');
@@ -17,7 +17,7 @@ const CHART_H = 130;
 export default function InsightsScreen() {
   const { state: { habits, logs } } = useApp();
   const colors = useColors();
-  const s = getStyles(colors);
+  const s = useMemo(() => getStyles(colors), [colors]);
 
   // ── AI state ───────────────────────────────────────────────────────────────
   const [coaching, setCoaching] = useState(null);
@@ -63,7 +63,7 @@ export default function InsightsScreen() {
     } else {
       setCoachingLoading(false);
     }
-  }, [habits.length > 0]);
+  }, [habits.length]);
 
   useEffect(() => {
     if (habits.length > 0) {
@@ -72,36 +72,13 @@ export default function InsightsScreen() {
   }, [reflectionTab]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
+  const [chartDays, setChartDays] = useState(7);
   const stats = useMemo(() => weeklyStats(logs, habits, 7), [logs, habits]);
+  const chartStats = useMemo(() => chartDays === 7 ? stats : weeklyStats(logs, habits, 30), [logs, habits, chartDays, stats]);
   const barW = Math.floor((CHART_W - 16) / 7) - 4;
 
-  const overallStreak = useMemo(() => {
-    let streak = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const key = dateKey(d);
-      const allDone = habits.length > 0 && habits.every(h => countForDate(logs, h.id, key) >= h.targetCount);
-      if (allDone) streak++;
-      else if (i > 0) break;
-    }
-    return streak;
-  }, [logs, habits]);
-
-  const bestStreak = useMemo(() => {
-    let best = 0, cur = 0;
-    const today = new Date();
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const key = dateKey(d);
-      const allDone = habits.length > 0 && habits.every(h => countForDate(logs, h.id, key) >= h.targetCount);
-      if (allDone) { cur++; best = Math.max(best, cur); }
-      else cur = 0;
-    }
-    return best;
-  }, [logs, habits]);
+  const overallStreak = useMemo(() => calcOverallStreak(logs, habits), [logs, habits]);
+  const bestStreak = useMemo(() => calcBestStreak(logs, habits), [logs, habits]);
 
   const avgPct = stats.length > 0
     ? Math.round(stats.reduce((sum, d) => sum + d.pct, 0) / stats.length * 100)
@@ -171,33 +148,52 @@ export default function InsightsScreen() {
           />
         )}
 
-        {/* ── 7-day bar chart ── */}
-        <Text style={s.sectionLabel}>Last 7 Days</Text>
+        {/* ── Bar chart with period toggle ── */}
+        <View style={s.chartHeaderRow}>
+          <Text style={[s.sectionLabel, { marginTop: 0, marginBottom: 0 }]}>{chartDays === 7 ? 'Last 7 Days' : 'Last 30 Days'}</Text>
+          <View style={s.chartPillRow}>
+            {[7, 30].map(d => (
+              <TouchableOpacity
+                key={d}
+                style={[s.chartPill, chartDays === d && s.chartPillActive]}
+                onPress={() => setChartDays(d)}
+              >
+                <Text style={[s.chartPillText, chartDays === d && s.chartPillTextActive]}>
+                  {d === 7 ? '7D' : '30D'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <View style={s.chartCard}>
-          <Svg width={CHART_W} height={CHART_H + 30}>
-            <Line x1={0} y1={CHART_H} x2={CHART_W} y2={CHART_H} stroke={colors.border} strokeWidth={1} />
-            {stats.map((day, i) => {
-              const barH = Math.max(day.pct * CHART_H, day.pct > 0 ? 4 : 0);
-              const x = i * (barW + 4) + 8;
-              const y = CHART_H - barH;
-              const isToday = i === 6;
-              const fill = isToday ? colors.primary : colors.text;
-              const barOpacity = isToday ? 1 : 0.2;
-              return (
-                <React.Fragment key={day.date}>
-                  <Rect x={x} y={y} width={barW} height={barH} rx={4} fill={fill} opacity={barOpacity} />
-                  <SvgText x={x + barW / 2} y={CHART_H + 18} textAnchor="middle" fontSize={10} fill={colors.textSecondary}>
-                    {day.label}
-                  </SvgText>
-                  {day.pct > 0 && (
-                    <SvgText x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} fill={fill} opacity={barOpacity}>
-                      {Math.round(day.pct * 100)}%
+          {chartDays === 7 ? (
+            <Svg width={CHART_W} height={CHART_H + 30}>
+              <Line x1={0} y1={CHART_H} x2={CHART_W} y2={CHART_H} stroke={colors.border} strokeWidth={1} />
+              {chartStats.map((day, i) => {
+                const barH = Math.max(day.pct * CHART_H, day.pct > 0 ? 4 : 0);
+                const x = i * (barW + 4) + 8;
+                const y = CHART_H - barH;
+                const isToday = i === 6;
+                const fill = isToday ? colors.primary : colors.text;
+                const barOpacity = isToday ? 1 : 0.2;
+                return (
+                  <React.Fragment key={day.date}>
+                    <Rect x={x} y={y} width={barW} height={barH} rx={Math.min(4, barW / 2)} fill={fill} opacity={barOpacity} />
+                    <SvgText x={x + barW / 2} y={CHART_H + 18} textAnchor="middle" fontSize={10} fill={colors.textSecondary}>
+                      {day.label}
                     </SvgText>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </Svg>
+                    {day.pct > 0 && (
+                      <SvgText x={x + barW / 2} y={y - 4} textAnchor="middle" fontSize={9} fill={fill} opacity={barOpacity}>
+                        {Math.round(day.pct * 100)}%
+                      </SvgText>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </Svg>
+          ) : (
+            <MonthCalendar logs={logs} habits={habits} colors={colors} s={s} />
+          )}
         </View>
 
         {/* ── Per-habit streaks ── */}
@@ -210,17 +206,17 @@ export default function InsightsScreen() {
                 const pct = Math.min(streak / 30, 1);
                 const IconComp = ICON_MAP[h.emoji];
                 return (
-                  <View key={h.id}>
-                    <View style={s.habitStreakRow}>
-                      <View style={s.habitStreakTile}>
-                        {IconComp ? <IconComp color={colors.card} size={16} /> : <Text style={{ fontSize: 14 }}>{h.emoji}</Text>}
-                      </View>
+                  <View key={h.id} style={s.habitStreakRow}>
+                    <View style={s.habitStreakTile}>
+                      {IconComp ? <IconComp color={colors.card} size={16} /> : <Text style={{ fontSize: 14 }}>{h.emoji}</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
                       <Text style={s.habitStreakName} numberOfLines={1}>{h.name}</Text>
-                      <Text style={s.habitStreakCount}>{streak}d</Text>
+                      <View style={s.habitStreakBar}>
+                        <View style={[s.habitStreakFill, { width: `${pct * 100}%` }]} />
+                      </View>
                     </View>
-                    <View style={s.habitStreakBar}>
-                      <View style={[s.habitStreakFill, { width: `${pct * 100}%` }]} />
-                    </View>
+                    <Text style={s.habitStreakCount}>{streak}d</Text>
                   </View>
                 );
               })}
@@ -251,7 +247,9 @@ export default function InsightsScreen() {
 
         {historyDays.length === 0 ? (
           <View style={s.empty}>
-            <Text style={s.emptyEmoji}>📋</Text>
+            <View style={s.emptyIconTile}>
+              <IconBarChart color={colors.card} size={28} />
+            </View>
             <Text style={s.emptyTitle}>No history yet</Text>
             <Text style={s.emptyHint}>Complete habits and they'll appear here.</Text>
           </View>
@@ -262,28 +260,123 @@ export default function InsightsScreen() {
                 <Text style={s.dayLabel}>{label}</Text>
                 <Text style={s.daySub}>{doneCount}/{habits.length} habits</Text>
               </View>
-              {entries.map(({ habitId, habit, count }) => (
-                <View key={habitId} style={[s.row, { borderLeftColor: habit.color }]}>
-                  <Text style={s.rowEmoji}>{habit.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.rowName}>{habit.name}</Text>
-                    {habit.type === 'volume' && (
-                      <Text style={s.rowCount}>{count}× completed</Text>
-                    )}
+              {entries.map(({ habitId, habit, count }) => {
+                const isDone = count >= habit.targetCount;
+                const HistIconComp = ICON_MAP[habit.emoji];
+                return (
+                  <View key={habitId} style={[s.row, { borderLeftColor: isDone ? colors.primary : colors.border }]}>
+                    <View style={s.rowIconTile}>
+                      {HistIconComp
+                        ? <HistIconComp color={colors.card} size={16} />
+                        : <Text style={{ fontSize: 13 }}>{habit.emoji}</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.rowName}>{habit.name}</Text>
+                      {habit.type === 'volume' && (
+                        <Text style={s.rowCount}>{count}× completed</Text>
+                      )}
+                    </View>
+                    <View style={[s.badge, {
+                      backgroundColor: isDone ? colors.primaryLight : colors.border,
+                    }]}>
+                      <Text style={[s.badgeText, {
+                        color: isDone ? colors.accentText : colors.textSecondary,
+                      }]}>
+                        {isDone ? '✓ Done' : `${count}/${habit.targetCount}`}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={[s.badge, { backgroundColor: habit.color + '22' }]}>
-                    <Text style={[s.badgeText, { color: habit.color }]}>
-                      {count >= habit.targetCount ? '✓ Done' : `${count}/${habit.targetCount}`}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ))
         )}
 
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// ── Month Calendar (heatmap) ──────────────────────────────────────────────────
+
+function MonthCalendar({ logs, habits, colors, s }) {
+  const todayKey = dateKey();
+
+  const { weeks, monthLabel } = useMemo(() => {
+    const now = new Date();
+    const dow = now.getDay();
+    const daysFromMon = (dow + 6) % 7;
+    const startUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - daysFromMon - 28);
+
+    const days = Array.from({ length: 35 }, (_, i) => {
+      const ms = startUTC + i * 86400000;
+      const d = new Date(ms);
+      const key = dateKey(d);
+      const isFuture = key > todayKey;
+      const isToday = key === todayKey;
+      const pct = (!isFuture && habits.length > 0)
+        ? habits.filter(h => countForDate(logs, h.id, key) >= h.targetCount).length / habits.length
+        : 0;
+      return { key, pct, isFuture, isToday, day: d.getUTCDate() };
+    });
+
+    const firstDate = new Date(startUTC);
+    const lastDate = new Date(startUTC + 34 * 86400000);
+    const toLocal = d => new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const fmtOpts = { month: 'short' };
+    const firstMonth = toLocal(firstDate).toLocaleDateString('en-US', fmtOpts);
+    const lastMonth = toLocal(lastDate).toLocaleDateString('en-US', fmtOpts);
+    const year = lastDate.getUTCFullYear();
+    const monthLabel = firstMonth === lastMonth
+      ? `${firstMonth} ${year}`
+      : `${firstMonth} – ${lastMonth} ${year}`;
+
+    return { weeks: Array.from({ length: 5 }, (_, w) => days.slice(w * 7, w * 7 + 7)), monthLabel };
+  }, [logs, habits, todayKey]);
+
+  const bgColor = (pct, isFuture) => {
+    if (isFuture) return colors.border + '30';
+    if (pct === 0) return colors.border;
+    if (pct < 0.5) return colors.primary + '55';
+    if (pct < 1) return colors.primary + 'AA';
+    return colors.primary;
+  };
+
+  return (
+    <View>
+      <Text style={s.calendarMonthLabel}>{monthLabel}</Text>
+      <View style={s.calendarRow}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <View key={i} style={s.calendarHeaderCell}>
+            <Text style={s.calendarHeaderText}>{d}</Text>
+          </View>
+        ))}
+      </View>
+      {weeks.map((week, wi) => (
+        <View key={wi} style={s.calendarRow}>
+          {week.map((day) => {
+            const todayBorder = day.isToday
+              ? { borderWidth: 2, borderColor: day.pct >= 1 ? 'rgba(255,255,255,0.6)' : colors.primary }
+              : {};
+            return (
+              <View
+                key={day.key}
+                style={[s.calendarCell, { backgroundColor: bgColor(day.pct, day.isFuture) }, todayBorder]}
+              >
+                <Text style={[
+                  s.calendarDayText,
+                  !day.isFuture && day.pct > 0 && { color: '#ffffff' },
+                  day.isToday && { fontWeight: '800' },
+                  day.isFuture && { opacity: 0.3 },
+                ]}>
+                  {day.day}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -410,16 +503,30 @@ function getStyles(colors) {
       padding: SPACING.md, borderWidth: 1.5, borderColor: colors.border,
       marginBottom: SPACING.sm,
     },
-    habitStreakRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: 6 },
+    habitStreakRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
     habitStreakTile: {
       width: 32, height: 32, borderRadius: 8,
       backgroundColor: colors.text,
       alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
     },
-    habitStreakName: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.text },
-    habitStreakCount: { fontSize: 13, fontWeight: '800', color: colors.primary },
-    habitStreakBar: { height: 3, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
+    habitStreakName: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 5 },
+    habitStreakCount: { fontSize: 13, fontWeight: '800', color: colors.primary, flexShrink: 0 },
+    habitStreakBar: { height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
     habitStreakFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
+
+    chartHeaderRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      marginBottom: SPACING.sm, marginTop: SPACING.lg,
+    },
+    chartPillRow: { flexDirection: 'row', gap: SPACING.xs },
+    chartPill: {
+      paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full,
+      borderWidth: 1.5, borderColor: colors.border,
+    },
+    chartPillActive: { backgroundColor: colors.text, borderColor: colors.text },
+    chartPillText: { fontSize: 11, fontWeight: '700', color: colors.textSecondary },
+    chartPillTextActive: { color: colors.card },
 
     coachCard: {
       backgroundColor: colors.card, borderRadius: RADIUS.lg,
@@ -480,13 +587,22 @@ function getStyles(colors) {
       shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
       gap: SPACING.sm,
     },
-    rowEmoji: { fontSize: 20 },
+    rowIconTile: {
+      width: 30, height: 30, borderRadius: 8,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    },
     rowName: { fontWeight: '500', fontSize: 14, color: colors.text },
     rowCount: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
     badge: { paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: RADIUS.full },
     badgeText: { fontSize: 12, fontWeight: '700' },
     empty: { alignItems: 'center', paddingVertical: 40 },
-    emptyEmoji: { fontSize: 48, marginBottom: SPACING.md },
+    emptyIconTile: {
+      width: 56, height: 56, borderRadius: 16,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md,
+    },
     emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: SPACING.sm },
     emptyHint: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
 
@@ -500,5 +616,18 @@ function getStyles(colors) {
     },
     generateBtnText: { fontSize: 14, fontWeight: '600' },
     regenerateBtn: { alignSelf: 'flex-end', marginTop: SPACING.sm },
+
+    calendarMonthLabel: {
+      fontSize: 11, fontWeight: '700', letterSpacing: 0.5,
+      color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8,
+    },
+    calendarRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+    calendarHeaderCell: { flex: 1, alignItems: 'center', paddingBottom: 4 },
+    calendarHeaderText: { fontSize: 10, fontWeight: '600', color: colors.textSecondary },
+    calendarCell: {
+      flex: 1, aspectRatio: 1, borderRadius: 7,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    calendarDayText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   });
 }

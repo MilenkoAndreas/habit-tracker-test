@@ -36,6 +36,13 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Supabase CLI temp files
+supabase/.temp/
+
+# Superpowers plugin cache
+.superpowers/
+
 # generated native folders
 /ios
 /android
+.env.local

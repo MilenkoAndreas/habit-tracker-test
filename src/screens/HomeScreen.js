@@ -7,9 +7,9 @@ import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import HabitCard from '../components/HabitCard';
 import ConfettiOverlay from '../components/ConfettiOverlay';
-import { IconCheck } from '../components/icons/index';
+import { IconCheck, IconFlame, IconTrophy, IconPlus } from '../components/icons/index';
 import { useApp, useColors } from '../AppContext';
-import { countForDate, dateKey } from '../storage';
+import { countForDate, dateKey, calcOverallStreak } from '../storage';
 import { SPACING, RADIUS } from '../theme';
 
 export default function HomeScreen({ navigation }) {
@@ -29,20 +29,7 @@ export default function HomeScreen({ navigation }) {
   const allDone = habits.length > 0 && completedHabits.length === habits.length;
   const progress = habits.length > 0 ? completedHabits.length / habits.length : 0;
 
-  // Overall streak: consecutive days where ALL habits were done
-  const overallStreak = useMemo(() => {
-    if (habits.length === 0) return 0;
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dk = dateKey(d);
-      const allDoneOnDay = habits.every(h => countForDate(logs, h.id, dk) >= h.targetCount);
-      if (allDoneOnDay) streak++;
-      else break;
-    }
-    return streak;
-  }, [habits, logs]);
+  const overallStreak = useMemo(() => calcOverallStreak(logs, habits), [logs, habits]);
 
   const challengeStreak = useMemo(() => {
     if (!challenge || challenge.completed) return 0;
@@ -52,7 +39,7 @@ export default function HomeScreen({ navigation }) {
       d.setDate(d.getDate() - i);
       const done = habits.every(h => countForDate(logs, h.id, dateKey(d)) >= h.targetCount);
       if (done) streak++;
-      else break;
+      else if (i > 0) break;
     }
     return streak;
   }, [challenge, habits, logs]);
@@ -125,7 +112,7 @@ export default function HomeScreen({ navigation }) {
   const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
   const ringOffset = CIRCUMFERENCE * (1 - progress);
 
-  const s = getStyles(colors);
+  const s = useMemo(() => getStyles(colors), [colors]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -167,14 +154,15 @@ export default function HomeScreen({ navigation }) {
             <Text style={s.greeting}>{greeting()}</Text>
             {overallStreak > 0 && (
               <View style={s.streakPill}>
-                <Text style={s.streakText}>🔥 {overallStreak}-day streak</Text>
+                <IconFlame color={colors.card} size={12} />
+                <Text style={s.streakText}>{overallStreak}-day streak</Text>
               </View>
             )}
           </View>
 
           {/* Add button */}
           <TouchableOpacity style={s.addBtn} onPress={openCreate}>
-            <Text style={s.addBtnText}>+</Text>
+            <IconPlus color={colors.card} size={18} />
           </TouchableOpacity>
         </View>
 
@@ -212,7 +200,7 @@ export default function HomeScreen({ navigation }) {
         {habits.length === 0 ? (
           <View style={s.empty}>
             <View style={s.emptyIconTile}>
-              <Text style={{ fontSize: 32 }}>+</Text>
+              <IconPlus color={colors.textSecondary} size={28} />
             </View>
             <Text style={s.emptyTitle}>No habits yet</Text>
             <Text style={s.emptyHint}>Add your first habit and start building momentum.</Text>
@@ -233,7 +221,7 @@ export default function HomeScreen({ navigation }) {
             ))}
             <TouchableOpacity style={s.addHabitRow} onPress={openCreate}>
               <View style={s.addHabitIcon}>
-                <Text style={s.addHabitPlus}>+</Text>
+                <IconPlus color={colors.textSecondary} size={16} />
               </View>
               <Text style={s.addHabitText}>Add another habit</Text>
             </TouchableOpacity>
@@ -260,7 +248,7 @@ export default function HomeScreen({ navigation }) {
         <View style={s.overlay}>
           <View style={s.challengeWinBox}>
             <View style={[s.celebrateIcon, { width: 64, height: 64, borderRadius: 20 }]}>
-              <Text style={{ fontSize: 32 }}>🏆</Text>
+              <IconTrophy color="#ffffff" size={32} />
             </View>
             <Text style={s.winTitle}>3-Day Kickstart{'\n'}Complete!</Text>
             <Text style={s.winSub}>You showed up 3 days in a row. That's how habits are born.</Text>
@@ -312,6 +300,7 @@ function getStyles(colors) {
     greeting: { fontSize: 22, fontWeight: '900', color: colors.text, letterSpacing: -0.5, lineHeight: 26 },
     streakPill: {
       marginTop: 8, alignSelf: 'flex-start',
+      flexDirection: 'row', alignItems: 'center', gap: 5,
       backgroundColor: colors.text, borderRadius: RADIUS.full,
       paddingHorizontal: 10, paddingVertical: 4,
     },
@@ -322,7 +311,6 @@ function getStyles(colors) {
       alignItems: 'center', justifyContent: 'center',
       alignSelf: 'flex-start',
     },
-    addBtnText: { color: colors.card, fontSize: 22, fontWeight: '300', lineHeight: 26 },
     divider: { height: 1.5, backgroundColor: colors.border, marginBottom: SPACING.md },
 
     // Challenge card
@@ -375,7 +363,6 @@ function getStyles(colors) {
       backgroundColor: colors.border,
       alignItems: 'center', justifyContent: 'center',
     },
-    addHabitPlus: { color: colors.textSecondary, fontWeight: '700', fontSize: 18, lineHeight: 22 },
     addHabitText: { color: colors.textSecondary, fontWeight: '600', fontSize: 15 },
 
     // Modals

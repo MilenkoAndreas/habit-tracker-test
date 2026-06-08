@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, SafeAreaView, Switch,
 } from 'react-native';
@@ -9,7 +9,7 @@ import { useAuth } from '../AuthContext';
 import { calcStreak, dateKey } from '../storage';
 import { cancelHabitReminder } from '../notifications';
 import { SPACING, RADIUS } from '../theme';
-import { ICON_MAP } from '../components/icons/index';
+import { ICON_MAP, IconGrid } from '../components/icons/index';
 
 export default function ManageScreen({ navigation }) {
   const { state, dispatch } = useApp();
@@ -18,7 +18,7 @@ export default function ManageScreen({ navigation }) {
   const { habits, logs, darkMode } = state;
   const [showDevTools, setShowDevTools] = useState(false);
   const [pastDays, setPastDays] = useState(3);
-  const s = getStyles(colors);
+  const s = useMemo(() => getStyles(colors), [colors]);
 
   const formatTime = (h, m) => {
     const hr = h % 12 || 12;
@@ -139,7 +139,9 @@ export default function ManageScreen({ navigation }) {
         <Text style={s.sectionLabel}>My Habits</Text>
         {habits.length === 0 ? (
           <View style={s.empty}>
-            <Text style={s.emptyEmoji}>🌱</Text>
+            <View style={s.emptyIconTile}>
+              <IconGrid color={colors.card} size={28} />
+            </View>
             <Text style={s.emptyTitle}>No habits yet</Text>
             <Text style={s.emptyHint}>Add your first habit to get started.</Text>
             <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
@@ -328,7 +330,11 @@ function getStyles(colors) {
     stepperRunText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
     empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: SPACING.lg },
-    emptyEmoji: { fontSize: 48, marginBottom: SPACING.md },
+    emptyIconTile: {
+      width: 64, height: 64, borderRadius: 18,
+      backgroundColor: colors.text,
+      alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md,
+    },
     emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: SPACING.sm },
     emptyHint: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: SPACING.xl },
     emptyBtn: { backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.full },

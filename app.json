@@ -3,6 +3,7 @@
     "name": "habit-tracker-test",
     "slug": "habit-tracker-test",
     "version": "1.0.0",
+    "scheme": "antigravity",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,6 +20,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

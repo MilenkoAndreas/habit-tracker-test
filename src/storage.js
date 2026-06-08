@@ -87,6 +87,40 @@ export async function saveNotificationPrefs(prefs) {
 }
 
 // Get completion % for each of last N days across all habits
+// Overall streak: consecutive days where ALL habits were completed.
+// Today gets a grace period (i === 0 doesn't break) so the streak reads as
+// "still alive" while the day is in progress.
+export function calcOverallStreak(logs, habits) {
+  if (habits.length === 0) return 0;
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = dateKey(d);
+    const allDone = habits.every(h => countForDate(logs, h.id, key) >= h.targetCount);
+    if (allDone) streak++;
+    else if (i > 0) break;
+  }
+  return streak;
+}
+
+// Best ever streak across the last 365 days.
+export function calcBestStreak(logs, habits) {
+  if (habits.length === 0) return 0;
+  let best = 0, cur = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = dateKey(d);
+    const allDone = habits.every(h => countForDate(logs, h.id, key) >= h.targetCount);
+    if (allDone) { cur++; best = Math.max(best, cur); }
+    else cur = 0;
+  }
+  return best;
+}
+
 export function weeklyStats(logs, habits, days = 7) {
   const stats = [];
   const today = new Date();

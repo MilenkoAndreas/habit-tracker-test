@@ -4,9 +4,33 @@ import {
   SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { useAuth } from '../AuthContext';
 import { useColors } from '../AppContext';
 import { SPACING, RADIUS } from '../theme';
+
+function BrandIcon() {
+  return (
+    <View style={{ width: 88, height: 88, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={52} height={52} viewBox="0 0 52 52" fill="none">
+        <Path d="M26 42V12" stroke="white" strokeWidth={4} strokeLinecap="round" />
+        <Path d="M14 24l12-12 12 12" stroke="white" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d="M14 36h24" stroke="white" strokeWidth={3} strokeLinecap="round" opacity={0.5} />
+      </Svg>
+    </View>
+  );
+}
+
+function MailIcon() {
+  return (
+    <View style={{ width: 88, height: 88, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={52} height={52} viewBox="0 0 52 52" fill="none">
+        <Rect x={6} y={14} width={40} height={28} rx={5} stroke="white" strokeWidth={3} />
+        <Path d="M6 20l20 13 20-13" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+}
 
 function friendlyError(msg) {
   if (!msg) return '';
@@ -93,7 +117,7 @@ export default function AuthScreen() {
       <View style={[s.gradient, { backgroundColor: colors.primary }]}>
         <SafeAreaView style={s.safe}>
           <View style={s.confirmWrap}>
-            <Text style={s.confirmIcon}>📬</Text>
+            <MailIcon />
             <Text style={s.confirmTitle}>Check your email</Text>
             <Text style={s.confirmBody}>
               We sent a confirmation link to{'\n'}
@@ -127,7 +151,7 @@ export default function AuthScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={s.hero}>
-              <Text style={s.icon}>🚀</Text>
+              <BrandIcon />
               <Text style={s.title}>Antigravity</Text>
               <Text style={s.tagline}>Your daily habit tracker</Text>
             </View>
@@ -284,8 +308,7 @@ function getStyles(colors) {
     gradient: { flex: 1 },
     safe: { flex: 1 },
     scroll: { flexGrow: 1, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xl },
-    hero: { alignItems: 'center', paddingTop: SPACING.xxl, paddingBottom: SPACING.xl },
-    icon: { fontSize: 72, marginBottom: SPACING.sm },
+    hero: { alignItems: 'center', paddingTop: SPACING.xxl, paddingBottom: SPACING.xl, gap: SPACING.sm },
     title: { fontSize: 36, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
     tagline: { fontSize: 15, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
     card: {
@@ -343,8 +366,7 @@ function getStyles(colors) {
     hint: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: SPACING.sm },
     hintLink: { color: colors.primary, fontWeight: '600' },
     confirmWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
-    confirmIcon: { fontSize: 72, marginBottom: SPACING.lg },
-    confirmTitle: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: SPACING.md },
+    confirmTitle: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: SPACING.md, marginTop: SPACING.lg },
     confirmBody: { fontSize: 16, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 24 },
     confirmEmail: { fontWeight: '700', color: '#fff' },
     confirmBtn: {

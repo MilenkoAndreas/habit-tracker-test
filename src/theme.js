@@ -30,17 +30,18 @@ export const DARK_COLORS = {
   accentBorder: '#14532D',
   accentText: '#4ADE80',
 
-  background: '#0D0D0D',
-  card: '#1A1A1A',
-  text: '#F5F5F5',
-  textSecondary: '#6B7280',
-  border: '#2A2A2A',
-  overlay: 'rgba(0,0,0,0.75)',
+  // True iOS dark mode system palette (OLED-optimised, matches UIKit defaults)
+  background: '#000000',   // systemBackground — pure black for OLED
+  card: '#1C1C1E',         // secondarySystemBackground — elevated surface
+  text: '#FFFFFF',         // label — full white
+  textSecondary: '#8E8E93', // secondaryLabel — iOS grey3
+  border: '#38383A',       // opaqueSeparator — iOS system separator dark
+  overlay: 'rgba(0,0,0,0.8)',
 
   success: '#16A34A',
   successLight: '#052E16',
   warning: '#D97706',
-  danger: '#EF4444',
+  danger: '#FF453A',       // systemRed dark
 };
 
 // Legacy alias — keeps App.js splash screen working without edits

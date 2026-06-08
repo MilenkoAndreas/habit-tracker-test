@@ -142,6 +142,40 @@ export function IconHeart({ color = DEFAULT_COLOR, size = DEFAULT_SIZE }) {
   );
 }
 
+export function IconPlus({ color = DEFAULT_COLOR, size = DEFAULT_SIZE }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 5v14M5 12h14" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconFlame({ color = DEFAULT_COLOR, size = DEFAULT_SIZE }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3C12 3 7 8.5 7 14a5 5 0 0010 0c0-2.5-1-4.5-2.5-6-0.5 2-1.5 3-2.5 3 1.5-2.5 0-8 0-8z"
+        stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconTrophy({ color = DEFAULT_COLOR, size = DEFAULT_SIZE }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M8 21h8M12 17v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path
+        d="M7 4h10v8a5 5 0 01-10 0V4z"
+        stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      />
+      <Path d="M7 6H4l1 4a3 3 0 002 1.5M17 6h3l-1 4a3 3 0 01-2 1.5"
+        stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 // ── Checkmark (used inside the done check tile on HabitCard) ───────────────
 
 export function IconCheck({ color = '#ffffff', size = DEFAULT_SIZE }) { // white default: always rendered inside a colored tile
